@@ -25,7 +25,7 @@ jobs:
           if [[ $(sed -n '2p' "$FILE") =~ ^source[[:space:]]+<(curl -s https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/build.func) ]]; then
             echo "Check passed for: $FILE"
           else
-            echo "Error in $FILE: Line 2 must be exactly 'source <(curl -s https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/build.func)' if a source line is used."
+            echo "Error in $FILE: Line 2 must be exactly 'source <(curl -s https://raw.githubusercontent.com/pranavmishra90/ProxmoxVE/main/misc/build.func)' if a source line is used."
             ERROR_COUNT=$((ERROR_COUNT + 1))
           fi
 
