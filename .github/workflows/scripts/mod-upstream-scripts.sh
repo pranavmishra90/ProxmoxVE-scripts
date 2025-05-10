@@ -24,7 +24,7 @@ git checkout --no-track -B ${BRANCH_NAME} main
 
 # Fetch the latest changes from the upstream repository into the upstream branch
 git checkout upstream
-git merge upstream/main
+git merge upstream/main -X ours
 
 # Merge the upstream branch into the intermediate branch
 git checkout ${BRANCH_NAME}
