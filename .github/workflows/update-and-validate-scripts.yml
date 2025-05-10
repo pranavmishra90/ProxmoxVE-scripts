@@ -25,7 +25,7 @@ jobs:
 
       - name: Modify script URLs and fix permissions
         shell: bash
-        run: ./fork/mod-upstream-scripts.sh
+        run: ./.github/workflows/scripts/mod-upstream-scripts.sh
 
       - name: Add a date stamp
         id: date_stamp
