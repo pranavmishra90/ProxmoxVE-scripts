@@ -1,0 +1,60 @@
+name: Modify shell scripts
+
+on:
+  push:
+    branches:
+      - upstream
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Run without creating a pull request"
+        required: false
+        default: "false"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  modify-and-validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Modify script URLs and fix permissions
+        shell: bash
+        run: ./fork/mod-upstream-scripts.sh
+
+      - name: Add a date stamp
+        id: date_stamp
+        run: |
+          DATESTAMP=$(date +%Y-%m-%d)
+          echo "timestamp=$DATESTAMP" >> $GITHUB_ENV
+          echo "Generated timestamp: $DATESTAMP"
+
+      - name: Dry Run Check
+        id: dry_run_check
+        run: |
+          echo "DRY_RUN=${{ github.event.inputs.dry_run }}" >> $GITHUB_ENV
+          echo "Dry run mode is set to: ${{ github.event.inputs.dry_run }}"
+
+      - name: Log Dry-Run Status
+        run: |
+          echo "Dry run mode is set to: $DRY_RUN"
+
+      - name: Create Pull Request
+        id: create_pr
+        if: env.DRY_RUN != 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          title: "Updated scripts from upstream"
+          body: |
+            This PR updates the scripts from the upstream repository.  
+            - URLs have been modified to this fork.
+            - Permissions have been fixed.
+
+          base: main
+          commit-message: "ci: date stamp"
+          branch: "feat/update-${{ env.timestamp }}"
