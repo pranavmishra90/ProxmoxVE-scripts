@@ -9,7 +9,7 @@ on:
       dry_run:
         description: "Run without creating a pull request"
         required: false
-        default: "false"
+        default: "true"
 
 permissions:
   contents: write
