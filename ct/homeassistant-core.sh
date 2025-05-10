@@ -5,139 +5,146 @@ source <(curl -s https://raw.githubusercontent.com/pranavmishra90/ProxmoxVE/main
 # License: MIT
 # https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
 
-function header_info {
-  clear
-  cat <<"EOF"
-                                _           _     _              _       ___               
-  /\  /\___  _ __ ___   ___    /_\  ___ ___(_)___| |_ __ _ _ __ | |_    / __\___  _ __ ___ 
- / /_/ / _ \| '_ ` _ \ / _ \  //_\\/ __/ __| / __| __/ _` | '_ \| __|  / /  / _ \| '__/ _ \
-/ __  / (_) | | | | | |  __/ /  _  \__ \__ \ \__ \ || (_| | | | | |_  / /__| (_) | | |  __/
-\/ /_/ \___/|_| |_| |_|\___| \_/ \_/___/___/_|___/\__\__,_|_| |_|\__| \____/\___/|_|  \___|
-                                                                                           
-EOF
-}
-header_info
-echo -e "Loading..."
 APP="Home Assistant-Core"
-var_disk="8"
-var_cpu="2"
-var_ram="1024"
-var_os="ubuntu"
-var_version="24.04"
+var_tags="${var_tags:-automation;smarthome}"
+var_cpu="${var_cpu:-2}"
+var_ram="${var_ram:-2048}"
+var_disk="${var_disk:-10}"
+var_os="${var_os:-ubuntu}"
+var_version="${var_version:-24.10}"
+var_unprivileged="${var_unprivileged:-1}"
+
+header_info "$APP"
 variables
 color
 catch_errors
 
-function default_settings() {
-  CT_TYPE="1"
-  PW=""
-  CT_ID=$NEXTID
-  HN=$NSAPP
-  DISK_SIZE="$var_disk"
-  CORE_COUNT="$var_cpu"
-  RAM_SIZE="$var_ram"
-  BRG="vmbr0"
-  NET="dhcp"
-  GATE=""
-  APT_CACHER=""
-  APT_CACHER_IP=""
-  DISABLEIP6="no"
-  MTU=""
-  SD=""
-  NS=""
-  MAC=""
-  VLAN=""
-  SSH="no"
-  VERB="no"
-  echo_default
-}
-
 function update_script() {
   header_info
+  if ! lsb_release -d | grep -q "Ubuntu 24.10"; then
+    msg_error "Wrong OS detected. This script only supports Ubuntu 24.10."
+    msg_error "Read Guide: https://github.com/community-scripts/ProxmoxVE/discussions/1549"
+    exit 1
+  fi
   check_container_storage
   check_container_resources
   if [[ ! -d /srv/homeassistant ]]; then
     msg_error "No ${APP} Installation Found!"
-    exit
+    exit 1
   fi
-  PY=$(ls /srv/homeassistant/lib/)
+  setup_uv
   IP=$(hostname -I | awk '{print $1}')
   UPD=$(whiptail --backtitle "Proxmox VE Helper Scripts" --title "UPDATE" --radiolist --cancel-button Exit-Script "Spacebar = Select" 11 58 4 \
     "1" "Update Core" ON \
     "2" "Install HACS" OFF \
     "3" "Install FileBrowser" OFF \
     3>&1 1>&2 2>&3)
+
   if [ "$UPD" == "1" ]; then
     if (whiptail --backtitle "Proxmox VE Helper Scripts" --defaultno --title "SELECT BRANCH" --yesno "Use Beta Branch?" 10 58); then
       clear
       header_info
       echo -e "${GN}Updating to Beta Version${CL}"
-      BR="--pre "
+      BR="--pre"
     else
       clear
       header_info
       echo -e "${GN}Updating to Stable Version${CL}"
       BR=""
     fi
-    if [[ "$PY" == "python3.11" ]]; then echo -e "⚠️  Home Assistant will soon require Python 3.12."; fi
 
     msg_info "Stopping Home Assistant"
     systemctl stop homeassistant
     msg_ok "Stopped Home Assistant"
 
+    if [[ -d /srv/homeassistant/bin ]]; then
+      msg_info "Migrating to .venv-based structure"
+      $STD source /srv/homeassistant/bin/activate
+      PY_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+      $STD deactivate
+      mv /srv/homeassistant "/srv/homeassistant_backup_$PY_VER"
+      mkdir -p /srv/homeassistant
+      cd /srv/homeassistant
+
+      $STD uv python install 3.13
+      UV_PYTHON=$(uv python list | awk '/3\.13\.[0-9]+.*\/root\/.local/ {print $2; exit}')
+      if [[ -z "$UV_PYTHON" ]]; then
+        msg_error "No local Python 3.13 found via uv"
+        exit 1
+      fi
+
+      $STD uv venv .venv --python "$UV_PYTHON"
+      $STD source .venv/bin/activate
+      $STD uv pip install homeassistant mysqlclient psycopg2-binary isal webrtcvad wheel
+      mkdir -p /root/.homeassistant
+      msg_ok "Migration complete"
+    else
+      source /srv/homeassistant/.venv/bin/activate
+    fi
+
     msg_info "Updating Home Assistant"
-    source /srv/homeassistant/bin/activate
-    uv pip install ${BR}--upgrade homeassistant &>/dev/null
+    $STD uv pip install $BR --upgrade homeassistant
     msg_ok "Updated Home Assistant"
 
     msg_info "Starting Home Assistant"
+    if [[ -f /etc/systemd/system/homeassistant.service ]] && grep -q "/srv/homeassistant/bin/python3" /etc/systemd/system/homeassistant.service; then
+      sed -i 's|ExecStart=/srv/homeassistant/bin/python3|ExecStart=/srv/homeassistant/.venv/bin/python3|' /etc/systemd/system/homeassistant.service
+      sed -i 's|PATH=/srv/homeassistant/bin|PATH=/srv/homeassistant/.venv/bin|' /etc/systemd/system/homeassistant.service
+      $STD systemctl daemon-reload
+    fi
+
     systemctl start homeassistant
-    sleep 2
+    sleep 5
     msg_ok "Started Home Assistant"
     msg_ok "Update Successful"
-    echo -e "\n  Go to http://${IP}:8123 \n"
+    echo -e "${TAB}${GATEWAY}${BGN}http://${IP}:8123${CL}"
     exit
   fi
+
   if [ "$UPD" == "2" ]; then
     msg_info "Installing Home Assistant Community Store (HACS)"
-    apt update &>/dev/null
-    apt install unzip &>/dev/null
-    cd .homeassistant
-    bash <(curl -fsSL https://get.hacs.xyz) &>/dev/null
+    $STD apt update
+    $STD apt install -y unzip
+    cd /root/.homeassistant
+    $STD bash <(curl -fsSL https://get.hacs.xyz)
     msg_ok "Installed Home Assistant Community Store (HACS)"
     echo -e "\n Reboot Home Assistant and clear browser cache then Add HACS integration.\n"
     exit
   fi
+
   if [ "$UPD" == "3" ]; then
     set +Eeuo pipefail
     read -r -p "Would you like to use No Authentication? <y/N> " prompt
     msg_info "Installing FileBrowser"
     RELEASE=$(curl -fsSL https://api.github.com/repos/filebrowser/filebrowser/releases/latest | grep -o '"tag_name": ".*"' | sed 's/"//g' | sed 's/tag_name: //g')
-    curl -fsSL https://github.com/filebrowser/filebrowser/releases/download/$RELEASE/linux-amd64-filebrowser.tar.gz | tar -xzv -C /usr/local/bin &>/dev/null
+    $STD curl -fsSL https://github.com/filebrowser/filebrowser/releases/download/$RELEASE/linux-amd64-filebrowser.tar.gz | tar -xzv -C /usr/local/bin
 
     if [[ "${prompt,,}" =~ ^(y|yes)$ ]]; then
-      filebrowser config init -a '0.0.0.0' &>/dev/null
-      filebrowser config set -a '0.0.0.0' &>/dev/null
-      filebrowser config set --auth.method=noauth &>/dev/null
-      filebrowser users add ID 1 --perm.admin &>/dev/null  
+      $STD filebrowser config init -a '0.0.0.0'
+      $STD filebrowser config set -a '0.0.0.0'
+      $STD filebrowser config set --auth.method=noauth
+      $STD filebrowser users add ID 1 --perm.admin
     else
-      filebrowser config init -a '0.0.0.0' &>/dev/null
-      filebrowser config set -a '0.0.0.0' &>/dev/null
-      filebrowser users add admin helper-scripts.com --perm.admin &>/dev/null
+      $STD filebrowser config init -a '0.0.0.0'
+      $STD filebrowser config set -a '0.0.0.0'
+      $STD filebrowser users add admin helper-scripts.com --perm.admin
     fi
     msg_ok "Installed FileBrowser"
 
     msg_info "Creating Service"
-    service_path="/etc/systemd/system/filebrowser.service"
-    echo "[Unit]
+    cat <<EOF >/etc/systemd/system/filebrowser.service
+[Unit]
 Description=Filebrowser
 After=network-online.target
+
 [Service]
 User=root
 WorkingDirectory=/root/
 ExecStart=/usr/local/bin/filebrowser -r /root/.homeassistant
+
 [Install]
-WantedBy=default.target" >$service_path
+WantedBy=default.target
+EOF
 
     systemctl enable --now -q filebrowser.service
     msg_ok "Created Service"
@@ -154,5 +161,6 @@ build_container
 description
 
 msg_ok "Completed Successfully!\n"
-echo -e "${APP} should be reachable by going to the following URL.
-         ${BL}http://${IP}:8123${CL}"
+echo -e "${CREATING}${GN}${APP} setup has been successfully initialized!${CL}"
+echo -e "${INFO}${YW} Access it using the following URL:${CL}"
+echo -e "${TAB}${GATEWAY}${BGN}http://${IP}:8123${CL}"

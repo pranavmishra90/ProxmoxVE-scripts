@@ -2,55 +2,22 @@
 source <(curl -s https://raw.githubusercontent.com/pranavmishra90/ProxmoxVE/main/misc/build.func)
 # Copyright (c) 2021-2024 tteck
 # Author: tteck (tteckster)
-# License: MIT
-# https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+# License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+# Source: https://www.home-assistant.io/
 
-function header_info {
-  clear
-  cat <<"EOF"
-    __  __                        ___              _      __              __ 
-   / / / /___  ____ ___  ___     /   |  __________(_)____/ /_____ _____  / /_
-  / /_/ / __ \/ __  __ \/ _ \   / /| | / ___/ ___/ / ___/ __/ __  / __ \/ __/
- / __  / /_/ / / / / / /  __/  / ___ |(__  |__  ) (__  ) /_/ /_/ / / / / /_  
-/_/ /_/\____/_/ /_/ /_/\___/  /_/  |_/____/____/_/____/\__/\__,_/_/ /_/\__/  
- 
-EOF
-}
-header_info
-echo -e "Loading..."
 APP="Home Assistant"
-var_disk="16"
-var_cpu="2"
-var_ram="2048"
-var_os="debian"
-var_version="12"
+var_tags="${var_tags:-automation;smarthome}"
+var_cpu="${var_cpu:-2}"
+var_ram="${var_ram:-2048}"
+var_disk="${var_disk:-16}"
+var_os="${var_os:-debian}"
+var_version="${var_version:-12}"
+var_unprivileged="${var_unprivileged:-1}"
+
+header_info "$APP"
 variables
 color
 catch_errors
-
-function default_settings() {
-  CT_TYPE="1"
-  PW=""
-  CT_ID=$NEXTID
-  HN=$NSAPP
-  DISK_SIZE="$var_disk"
-  CORE_COUNT="$var_cpu"
-  RAM_SIZE="$var_ram"
-  BRG="vmbr0"
-  NET="dhcp"
-  GATE=""
-  APT_CACHER=""
-  APT_CACHER_IP=""
-  DISABLEIP6="no"
-  MTU=""
-  SD=""
-  NS=""
-  MAC=""
-  VLAN=""
-  SSH="no"
-  VERB="no"
-  echo_default
-}
 
 function update_script() {
   header_info
@@ -76,8 +43,9 @@ function update_script() {
       docker pull "${CONTAINER_IMAGE}"
       LATEST_IMAGE="$(docker inspect --format "{{.Id}}" --type image "${CONTAINER_IMAGE}")"
       if [[ "${RUNNING_IMAGE}" != "${LATEST_IMAGE}" ]]; then
+        pip install -U runlike
         echo "Updating ${container} image ${CONTAINER_IMAGE}"
-        DOCKER_COMMAND="$(runlike "${container}")"
+        DOCKER_COMMAND="$(runlike --use-volume-id "${container}")"
         docker rm --force "${container}"
         eval ${DOCKER_COMMAND}
       fi
@@ -93,10 +61,10 @@ function update_script() {
   fi
   if [ "$UPD" == "3" ]; then
     msg_info "Installing Home Assistant Community Store (HACS)"
-    apt update &>/dev/null
-    apt install unzip &>/dev/null
+    $STD apt update
+    $STD apt install unzip
     cd /var/lib/docker/volumes/hass_config/_data
-    bash <(curl -fsSL https://get.hacs.xyz) &>/dev/null
+    $STD bash <(curl -fsSL https://get.hacs.xyz)
     msg_ok "Installed Home Assistant Community Store (HACS)"
     echo -e "\n Reboot Home Assistant and clear browser cache then Add HACS integration.\n"
     exit
@@ -105,10 +73,10 @@ function update_script() {
     IP=$(hostname -I | awk '{print $1}')
     msg_info "Installing FileBrowser"
     RELEASE=$(curl -fsSL https://api.github.com/repos/filebrowser/filebrowser/releases/latest | grep -o '"tag_name": ".*"' | sed 's/"//g' | sed 's/tag_name: //g')
-    curl -fsSL https://github.com/filebrowser/filebrowser/releases/download/v2.23.0/linux-amd64-filebrowser.tar.gz | tar -xzv -C /usr/local/bin &>/dev/null
-    filebrowser config init -a '0.0.0.0' &>/dev/null
-    filebrowser config set -a '0.0.0.0' &>/dev/null
-    filebrowser users add admin helper-scripts.com --perm.admin &>/dev/null
+    $STD curl -fsSL https://github.com/filebrowser/filebrowser/releases/download/v2.23.0/linux-amd64-filebrowser.tar.gz | tar -xzv -C /usr/local/bin
+    $STD filebrowser config init -a '0.0.0.0'
+    $STD filebrowser config set -a '0.0.0.0'
+    $STD filebrowser users add admin helper-scripts.com --perm.admin
     msg_ok "Installed FileBrowser"
 
     msg_info "Creating Service"
@@ -123,7 +91,7 @@ ExecStart=/usr/local/bin/filebrowser -r /
 [Install]
 WantedBy=default.target" >$service_path
 
-    systemctl enable --now filebrowser.service &>/dev/null
+    $STD systemctl enable --now filebrowser
     msg_ok "Created Service"
 
     msg_ok "Completed Successfully!\n"
@@ -138,7 +106,7 @@ build_container
 description
 
 msg_ok "Completed Successfully!\n"
-echo -e "${APP} should be reachable by going to the following URL.
-         ${BL}http://${IP}:8123${CL}
-Portainer should be reachable by going to the following URL.
-         ${BL}https://${IP}:9443${CL}\n"
+echo -e "${CREATING}${GN}${APP} setup has been successfully initialized!${CL}"
+echo -e "${INFO}${YW} Access it using the following URL:${CL}"
+echo -e "${TAB}${GATEWAY}${BGN}HA: http://${IP}:8123${CL}"
+echo -e "${TAB}${GATEWAY}${BGN}Portainer: http://${IP}:9443${CL}"

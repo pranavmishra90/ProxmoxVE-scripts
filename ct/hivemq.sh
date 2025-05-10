@@ -2,63 +2,33 @@
 source <(curl -s https://raw.githubusercontent.com/pranavmishra90/ProxmoxVE/main/misc/build.func)
 # Copyright (c) 2021-2024 tteck
 # Author: tteck (tteckster)
-# License: MIT
-# https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+# License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+# Source: https://www.hivemq.com/
 
-function header_info {
-clear
-cat <<"EOF"
-    __  ___            __  _______      ____________
-   / / / (_)   _____  /  |/  / __ \    / ____/ ____/
-  / /_/ / / | / / _ \/ /|_/ / / / /   / /   / __/
- / __  / /| |/ /  __/ /  / / /_/ /   / /___/ /___
-/_/ /_/_/ |___/\___/_/  /_/\___\_\   \____/_____/
-
-EOF
-}
-header_info
-echo -e "Loading..."
 APP="HiveMQ"
-var_disk="4"
-var_cpu="1"
-var_ram="1024"
-var_os="debian"
-var_version="12"
+var_tags="${var_tags:-mqtt}"
+var_cpu="${var_cpu:-1}"
+var_ram="${var_ram:-1024}"
+var_disk="${var_disk:-4}"
+var_os="${var_os:-debian}"
+var_version="${var_version:-12}"
+var_unprivileged="${var_unprivileged:-1}"
+
+header_info "$APP"
 variables
 color
 catch_errors
 
-function default_settings() {
-  CT_TYPE="1"
-  PW=""
-  CT_ID=$NEXTID
-  HN=$NSAPP
-  DISK_SIZE="$var_disk"
-  CORE_COUNT="$var_cpu"
-  RAM_SIZE="$var_ram"
-  BRG="vmbr0"
-  NET="dhcp"
-  GATE=""
-  APT_CACHER=""
-  APT_CACHER_IP=""
-  DISABLEIP6="no"
-  MTU=""
-  SD=""
-  NS=""
-  MAC=""
-  VLAN=""
-  SSH="no"
-  VERB="no"
-  echo_default
-}
-
 function update_script() {
-header_info
-check_container_storage
-check_container_resources
-if [[ ! -d /var ]]; then msg_error "No ${APP} Installation Found!"; exit; fi
-msg_error "There is currently no update path available."
-exit
+    header_info
+    check_container_storage
+    check_container_resources
+    if [[ ! -d /var ]]; then
+        msg_error "No ${APP} Installation Found!"
+        exit
+    fi
+    msg_error "Currently we don't provide an update function for this ${APP}."
+    exit
 }
 
 start
@@ -66,3 +36,4 @@ build_container
 description
 
 msg_ok "Completed Successfully!\n"
+echo -e "${CREATING}${GN}${APP} setup has been successfully initialized!${CL}"

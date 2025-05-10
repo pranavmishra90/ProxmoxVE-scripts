@@ -5,74 +5,59 @@ source <(curl -s https://raw.githubusercontent.com/pranavmishra90/ProxmoxVE/main
 # License: MIT
 # https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
 
-function header_info {
-clear
-cat <<"EOF"
-   _____ ___    ____              __        __
-  / ___//   |  / __ )____  ____  / /_  ____/ /
-  \__ \/ /| | / __  / __ \/_  / / __ \/ __  / 
- ___/ / ___ |/ /_/ / / / / / /_/ /_/ / /_/ /  
-/____/_/  |_/_____/_/ /_/ /___/_.___/\__,_/   
-                                              
-EOF
-}
-header_info
-echo -e "Loading..."
 APP="SABnzbd"
-var_disk="8"
-var_cpu="2"
-var_ram="2048"
-var_os="debian"
-var_version="12"
+var_tags="${var_tags:-downloader}"
+var_cpu="${var_cpu:-2}"
+var_ram="${var_ram:-2048}"
+var_disk="${var_disk:-5}"
+var_os="${var_os:-debian}"
+var_version="${var_version:-12}"
+var_unprivileged="${var_unprivileged:-1}"
+
+header_info "$APP"
 variables
 color
 catch_errors
 
-function default_settings() {
-  CT_TYPE="1"
-  PW=""
-  CT_ID=$NEXTID
-  HN=$NSAPP
-  DISK_SIZE="$var_disk"
-  CORE_COUNT="$var_cpu"
-  RAM_SIZE="$var_ram"
-  BRG="vmbr0"
-  NET="dhcp"
-  GATE=""
-  APT_CACHER=""
-  APT_CACHER_IP=""
-  DISABLEIP6="no"
-  MTU=""
-  SD=""
-  NS=""
-  MAC=""
-  VLAN=""
-  SSH="no"
-  VERB="no"
-  echo_default
-}
-
 function update_script() {
-header_info
-check_container_storage
-check_container_resources
-if [[ ! -d /opt/sabnzbd ]]; then msg_error "No ${APP} Installation Found!"; exit; fi
-RELEASE=$(curl -s https://api.github.com/repos/sabnzbd/sabnzbd/releases/latest | grep "tag_name" | awk '{print substr($2, 2, length($2)-3) }')
-if [[ ! -f /opt/${APP}_version.txt ]] || [[ "${RELEASE}" != "$(cat /opt/${APP}_version.txt)" ]]; then
-   msg_info "Updating $APP to ${RELEASE}"
-   systemctl stop sabnzbd.service
-   tar zxvf <(curl -fsSL https://github.com/sabnzbd/sabnzbd/releases/download/$RELEASE/SABnzbd-${RELEASE}-src.tar.gz) &>/dev/null
-   \cp -r SABnzbd-${RELEASE}/* /opt/sabnzbd &>/dev/null
-   rm -rf SABnzbd-${RELEASE}
-   cd /opt/sabnzbd
-   python3 -m pip install -r requirements.txt &>/dev/null
-   echo "${RELEASE}" >/opt/${APP}_version.txt
-   systemctl start sabnzbd.service
-   msg_ok "Updated ${APP} to ${RELEASE}"
-else
-   msg_info "No update required. ${APP} is already at ${RELEASE}"
-fi
-exit
+    header_info
+    check_container_storage
+    check_container_resources
+
+    if [[ ! -d /opt/sabnzbd ]]; then
+        msg_error "No ${APP} Installation Found!"
+        exit
+    fi
+    setup_uv
+    RELEASE=$(curl -fsSL https://api.github.com/repos/sabnzbd/sabnzbd/releases/latest | grep "tag_name" | awk '{print substr($2, 2, length($2)-3) }')
+    if [[ -f /opt/${APP}_version.txt ]] && [[ "${RELEASE}" == "$(cat /opt/${APP}_version.txt)" ]]; then
+        msg_ok "No update required. ${APP} is already at ${RELEASE}"
+        exit
+    fi
+    msg_info "Updating $APP to ${RELEASE}"
+    systemctl stop sabnzbd
+    cp -r /opt/sabnzbd /opt/sabnzbd_backup_$(date +%s)
+    temp_file=$(mktemp)
+    curl -fsSL "https://github.com/sabnzbd/sabnzbd/releases/download/${RELEASE}/SABnzbd-${RELEASE}-src.tar.gz" -o "$temp_file"
+    tar -xzf "$temp_file" -C /opt/sabnzbd --strip-components=1
+    rm -f "$temp_file"
+    if [[ ! -d /opt/sabnzbd/venv ]]; then
+        msg_info "Migrating SABnzbd to uv virtual environment"
+        $STD uv venv /opt/sabnzbd/venv
+        msg_ok "Created uv venv at /opt/sabnzbd/venv"
+
+        if grep -q "ExecStart=python3 SABnzbd.py" /etc/systemd/system/sabnzbd.service; then
+            sed -i "s|ExecStart=python3 SABnzbd.py|ExecStart=/opt/sabnzbd/venv/bin/python SABnzbd.py|" /etc/systemd/system/sabnzbd.service
+            systemctl daemon-reload
+            msg_ok "Updated SABnzbd service to use uv venv"
+        fi
+    fi
+    $STD uv pip install --upgrade pip --python=/opt/sabnzbd/venv/bin/python
+    $STD uv pip install -r /opt/sabnzbd/requirements.txt --python=/opt/sabnzbd/venv/bin/python
+    echo "${RELEASE}" >/opt/${APP}_version.txt
+    systemctl start sabnzbd
+    msg_ok "Updated ${APP} to ${RELEASE}"
+    exit
 }
 
 start
@@ -80,5 +65,7 @@ build_container
 description
 
 msg_ok "Completed Successfully!\n"
-echo -e "${APP} should be reachable by going to the following URL.
-         ${BL}http://${IP}:7777${CL} \n"
+echo -e "${CREATING}${GN}${APP} setup has been successfully initialized!${CL}"
+echo -e "${INFO}${YW} Access it using the following URL:${CL}"
+echo -e "${TAB}${GATEWAY}${BGN}http://${IP}:7777${CL}"
+

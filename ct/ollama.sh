@@ -6,63 +6,56 @@ source <(curl -s https://raw.githubusercontent.com/pranavmishra90/ProxmoxVE/main
 # License: MIT
 # https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
 
-function header_info {
-clear
-cat <<"EOF"     
-   ____  ____
-  / __ \/ / /___ _____ ___  ____ _
- / / / / / / __ `/ __ `__ \/ __ `/
-/ /_/ / / / /_/ / / / / / / /_/ /
-\____/_/_/\__,_/_/ /_/ /_/\__,_/
-
-EOF
-}
-header_info
-echo -e "Loading..."
 APP="Ollama"
-var_disk="24"
-var_cpu="4"
-var_ram="4096"
-var_os="ubuntu"
-var_version="22.04"
+var_tags="${var_tags:-ai}"
+var_cpu="${var_cpu:-4}"
+var_ram="${var_ram:-4096}"
+var_disk="${var_disk:-35}"
+var_os="${var_os:-ubuntu}"
+var_version="${var_version:-24.04}"
+
+header_info "$APP"
 variables
 color
 catch_errors
 
-function default_settings() {
-  CT_TYPE="1"
-  PW=""
-  CT_ID=$NEXTID
-  HN=$NSAPP
-  DISK_SIZE="$var_disk"
-  CORE_COUNT="$var_cpu"
-  RAM_SIZE="$var_ram"
-  BRG="vmbr0"
-  NET="dhcp"
-  GATE=""
-  APT_CACHER=""
-  APT_CACHER_IP=""
-  DISABLEIP6="no"
-  MTU=""
-  SD=""
-  NS=""
-  MAC=""
-  VLAN=""
-  SSH="no"
-  VERB="no"
-  echo_default
-}
-
 function update_script() {
-header_info
-check_container_storage
-check_container_resources
-if [[ ! -d /opt/ollama ]]; then msg_error "No ${APP} Installation Found!"; exit; fi
-msg_info "Updating ${APP}"
-apt-get update &>/dev/null
-apt-get -y upgrade &>/dev/null
-msg_ok "Updated Successfully"
-exit
+  header_info
+  check_container_storage
+  check_container_resources
+  if [[ ! -d /usr/local/lib/ollama ]]; then
+    msg_error "No Ollama Installation Found!"
+    exit
+  fi
+  RELEASE=$(curl -fsSL https://api.github.com/repos/ollama/ollama/releases/latest | grep "tag_name" | awk -F '"' '{print $4}')
+  if [[ ! -f /opt/Ollama_version.txt ]] || [[ "${RELEASE}" != "$(cat /opt/Ollama_version.txt)" ]]; then
+    if [[ ! -f /opt/Ollama_version.txt ]]; then
+      touch /opt/Ollama_version.txt
+    fi
+    msg_info "Stopping Services"
+    systemctl stop ollama
+    msg_ok "Services Stopped"
+
+    TMP_TAR=$(mktemp --suffix=.tgz)
+    curl -fL# -o "${TMP_TAR}" "https://github.com/ollama/ollama/releases/download/${RELEASE}/ollama-linux-amd64.tgz"
+    msg_info "Updating Ollama to ${RELEASE}"
+    tar -xzf "${TMP_TAR}" -C /usr/local/lib/ollama
+    ln -sf /usr/local/lib/ollama/bin/ollama /usr/local/bin/ollama
+    echo "${RELEASE}" >/opt/Ollama_version.txt
+    msg_ok "Updated Ollama to ${RELEASE}"
+
+    msg_info "Starting Services"
+    systemctl start ollama
+    msg_ok "Started Services"
+
+    msg_info "Cleaning Up"
+    rm -f "${TMP_TAR}"
+    msg_ok "Cleaned"
+    msg_ok "Updated Successfully"
+  else
+    msg_ok "No update required. Ollama is already at ${RELEASE}"
+  fi
+  exit
 }
 
 start
@@ -70,5 +63,6 @@ build_container
 description
 
 msg_ok "Completed Successfully!\n"
-echo -e "${APP} should be reachable by going to the following URL.
-         ${BL}http://${IP}:11434${CL} \n"
+echo -e "${CREATING}${GN}${APP} setup has been successfully initialized!${CL}"
+echo -e "${INFO}${YW} Access it using the following URL:${CL}"
+echo -e "${TAB}${GATEWAY}${BGN}http://${IP}:11434${CL}"

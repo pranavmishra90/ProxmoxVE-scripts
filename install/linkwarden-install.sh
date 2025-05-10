@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 
-# Copyright (c) 2021-2024 tteck
+# Copyright (c) 2021-2025 tteck
 # Author: tteck (tteckster)
 # Co-Author: MickLesk (Canbiz)
-# License: MIT
-# https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+# License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+# Source: https://linkwarden.app/
 
-source /dev/stdin <<< "$FUNCTIONS_FILE_PATH"
+source /dev/stdin <<<"$FUNCTIONS_FILE_PATH"
 color
 verb_ip6
 catch_errors
@@ -16,31 +16,26 @@ update_os
 
 msg_info "Installing Dependencies"
 $STD apt-get install -y \
-  curl \
-  sudo \
-  mc \
   make \
-  postgresql \
-  cargo \
-  gnupg
+  git \
+  build-essential \
+  cargo
 msg_ok "Installed Dependencies"
 
-msg_info "Setting up Node.js Repository"
-mkdir -p /etc/apt/keyrings
-curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
-echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" >/etc/apt/sources.list.d/nodesource.list
-msg_ok "Set up Node.js Repository"
+NODE_VERSION="22"
+NODE_MODULE="yarn@latest"
+install_node_and_modules
+PG_VERSION="15"
+install_postgresql
 
-msg_info "Installing Node.js/Yarn"
-$STD apt-get update
-$STD apt-get install -y nodejs
-$STD npm install -g yarn
-msg_ok "Installed Node.js/Yarn"
-
-msg_info "Installing Monolith"
+msg_info "Installing Rust"
+curl -fsSL https://sh.rustup.rs -o rustup-init.sh
+$STD bash rustup-init.sh -y --profile minimal
+echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> ~/.bashrc
+export PATH="$HOME/.cargo/bin:$PATH"
+rm rustup-init.sh
 $STD cargo install monolith
-export PATH=~/.cargo/bin:$PATH
-msg_ok "Installed Monolith"
+msg_ok "Installed Rust"
 
 msg_info "Setting up PostgreSQL DB"
 DB_NAME=linkwardendb
@@ -53,12 +48,12 @@ $STD sudo -u postgres psql -c "ALTER ROLE $DB_USER SET client_encoding TO 'utf8'
 $STD sudo -u postgres psql -c "ALTER ROLE $DB_USER SET default_transaction_isolation TO 'read committed';"
 $STD sudo -u postgres psql -c "ALTER ROLE $DB_USER SET timezone TO 'UTC';"
 {
-    echo "Linkwarden-Credentials"
-    echo "Linkwarden Database User: $DB_USER"
-    echo "Linkwarden Database Password: $DB_PASS"
-    echo "Linkwarden Database Name: $DB_NAME"
-    echo "Linkwarden Secret: $SECRET_KEY"
-} >> ~/linkwarden.creds
+  echo "Linkwarden-Credentials"
+  echo "Linkwarden Database User: $DB_USER"
+  echo "Linkwarden Database Password: $DB_PASS"
+  echo "Linkwarden Database Name: $DB_NAME"
+  echo "Linkwarden Secret: $SECRET_KEY"
+} >>~/linkwarden.creds
 msg_ok "Set up PostgreSQL DB"
 
 read -r -p "Would you like to add Adminer? <y/N> " prompt
@@ -82,14 +77,14 @@ if [[ "${prompt,,}" =~ ^(y|yes)$ ]]; then
     echo "Adminer Database User: $DB_USER"
     echo "Adminer Database Password: $DB_PASS"
     echo "Adminer Database Name: $DB_NAME"
-} >> ~/linkwarden.creds
+  } >>~/linkwarden.creds
   msg_ok "Installed Adminer"
 fi
 
 msg_info "Installing Linkwarden (Patience)"
 cd /opt
-RELEASE=$(curl -s https://api.github.com/repos/linkwarden/linkwarden/releases/latest | grep "tag_name" | awk '{print substr($2, 2, length($2)-3) }')
-wget -q "https://github.com/linkwarden/linkwarden/archive/refs/tags/${RELEASE}.zip"
+RELEASE=$(curl -fsSL https://api.github.com/repos/linkwarden/linkwarden/releases/latest | grep "tag_name" | awk '{print substr($2, 2, length($2)-3) }')
+curl -fsSL "https://github.com/linkwarden/linkwarden/archive/refs/tags/${RELEASE}.zip" -o ${RELEASE}.zip
 unzip -q ${RELEASE}.zip
 mv linkwarden-${RELEASE:1} /opt/linkwarden
 cd /opt/linkwarden
@@ -103,8 +98,9 @@ NEXTAUTH_SECRET=${SECRET_KEY}
 NEXTAUTH_URL=http://${IP}:3000
 DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@localhost:5432/${DB_NAME}
 " >$env_path
-$STD yarn build
-$STD yarn prisma migrate deploy
+$STD yarn prisma:generate
+$STD yarn web:build
+$STD yarn prisma:deploy
 echo "${RELEASE}" >/opt/${APPLICATION}_version.txt
 msg_ok "Installed Linkwarden"
 
@@ -118,12 +114,12 @@ After=network.target
 Type=exec
 Environment=PATH=$PATH
 WorkingDirectory=/opt/linkwarden
-ExecStart=/usr/bin/yarn start
+ExecStart=/usr/bin/yarn concurrently:start
 
 [Install]
 WantedBy=multi-user.target
 EOF
-systemctl enable -q --now linkwarden.service
+systemctl enable -q --now linkwarden
 msg_ok "Created Service"
 
 motd_ssh

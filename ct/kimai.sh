@@ -2,97 +2,97 @@
 source <(curl -s https://raw.githubusercontent.com/pranavmishra90/ProxmoxVE/main/misc/build.func)
 # Copyright (c) 2021-2024 community-scripts ORG
 # Author: MickLesk (Canbiz)
-# License: MIT
-# https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+# License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+# Source: https://www.kimai.org/
 
-function header_info {
-clear
-cat <<"EOF"
-    __ __ _                 _ 
-   / //_/(_)___ ___  ____ _(_)
-  / ,<  / / __ `__ \/ __ `/ / 
- / /| |/ / / / / / / /_/ / /  
-/_/ |_/_/_/ /_/ /_/\__,_/_/   
-                              
-EOF
-}
-header_info
-echo -e "Loading..."
 APP="Kimai"
-var_disk="7"
-var_cpu="2"
-var_ram="2048"
-var_os="debian"
-var_version="12"
+var_tags="${var_tags:-time-tracking}"
+var_cpu="${var_cpu:-2}"
+var_ram="${var_ram:-2048}"
+var_disk="${var_disk:-7}"
+var_os="${var_os:-debian}"
+var_version="${var_version:-12}"
+var_unprivileged="${var_unprivileged:-1}"
+
+header_info "$APP"
 variables
 color
 catch_errors
 
-function default_settings() {
-  CT_TYPE="1"
-  PW=""
-  CT_ID=$NEXTID
-  HN=$NSAPP
-  DISK_SIZE="$var_disk"
-  CORE_COUNT="$var_cpu"
-  RAM_SIZE="$var_ram"
-  BRG="vmbr0"
-  NET="dhcp"
-  GATE=""
-  APT_CACHER=""
-  APT_CACHER_IP=""
-  DISABLEIP6="no"
-  MTU=""
-  SD=""
-  NS=""
-  MAC=""
-  VLAN=""
-  SSH="no"
-  VERB="no"
-  echo_default
-}
-
 function update_script() {
-header_info
-check_container_storage
-check_container_resources
-if [[ ! -d /opt/kimai ]]; then msg_error "No ${APP} Installation Found!"; exit; fi
-RELEASE=$(curl -s https://api.github.com/repos/kimai/kimai/releases/latest | grep "tag_name" | awk '{print substr($2, 2, length($2)-3) }')
-if [[ ! -f /opt/${APP}_version.txt ]] || [[ "${RELEASE}" != "$(cat /opt/${APP}_version.txt)" ]]; then
-  msg_info "Stopping Apache2"
-  systemctl stop apache2
-  msg_ok "Stopped Apache2"
+  header_info
+  check_container_storage
+  check_container_resources
+  if [[ ! -d /opt/kimai ]]; then
+    msg_error "No ${APP} Installation Found!"
+    exit
+  fi
+  CURRENT_PHP=$(php -v 2>/dev/null | awk '/^PHP/{print $2}' | cut -d. -f1,2)
+  if [[ "$CURRENT_PHP" != "8.4" ]]; then
+    msg_info "Migrating PHP $CURRENT_PHP to 8.4"
+    $STD curl -fsSLo /tmp/debsuryorg-archive-keyring.deb https://packages.sury.org/debsuryorg-archive-keyring.deb
+    $STD dpkg -i /tmp/debsuryorg-archive-keyring.deb
+    $STD sh -c 'echo "deb [signed-by=/usr/share/keyrings/deb.sury.org-php.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main" > /etc/apt/sources.list.d/php.list'
+    $STD apt-get update
+    $STD apt-get remove -y php"${CURRENT_PHP//./}"*
+    $STD apt-get install -y \
+      php8.4 \
+      php8.4-{gd,mysql,mbstring,bcmath,xml,curl,zip,intl} \
+      libapache2-mod-php8.4
+    msg_ok "Migrated PHP $CURRENT_PHP to 8.4"
+  fi
 
-  msg_info "Updating ${APP} to ${RELEASE}"
-  cp /opt/kimai/.env /opt/.env
-  rm -rf /opt/kimai
-  wget -q "https://github.com/kimai/kimai/archive/refs/tags/${RELEASE}.zip"
-  unzip -q ${RELEASE}.zip
-  mv kimai-${RELEASE} /opt/kimai
-  mv /opt/.env /opt/kimai/.env
-  cd /opt/kimai
-  composer install --no-dev --optimize-autoloader &>/dev/null
-  bin/console kimai:update &>/dev/null
-  chown -R :www-data .
-  chmod -R g+r .
-  chmod -R g+rw var/
-  sudo chown -R www-data:www-data /opt/kimai
-  sudo chmod -R 755 /opt/kimai
-  echo "${RELEASE}" >/opt/${APP}_version.txt
-  msg_ok "Updated ${APP} to ${RELEASE}"
+  RELEASE=$(curl -fsSL https://api.github.com/repos/kimai/kimai/releases/latest | grep "tag_name" | awk '{print substr($2, 2, length($2)-3) }')
+  BACKUP_DIR="/opt/kimai_backup"
 
-  msg_info "Starting Apache2"
-  systemctl start apache2
-  msg_ok "Started Apache2"
+  if [[ ! -f /opt/${APP}_version.txt ]] || [[ "${RELEASE}" != "$(cat /opt/${APP}_version.txt)" ]]; then
+    msg_info "Stopping Apache2"
+    systemctl stop apache2
+    msg_ok "Stopped Apache2"
 
-  msg_info "Cleaning Up"
-  rm -rf ${RELEASE}.zip
-  msg_ok "Cleaned"
-  msg_ok "Updated Successfully"
-else
-  msg_ok "No update required. ${APP} is already at ${RELEASE}"
-fi
-exit
+    msg_info "Backing up Kimai configuration and var directory"
+    mkdir -p "$BACKUP_DIR"
+    [ -d /opt/kimai/var ] && cp -r /opt/kimai/var "$BACKUP_DIR/"
+    [ -f /opt/kimai/.env ] && cp /opt/kimai/.env "$BACKUP_DIR/"
+    [ -f /opt/kimai/config/packages/local.yaml ] && cp /opt/kimai/config/packages/local.yaml "$BACKUP_DIR/"
+    msg_ok "Backup completed"
+
+    msg_info "Updating ${APP} to ${RELEASE}"
+    rm -rf /opt/kimai
+    curl -fsSL "https://github.com/kimai/kimai/archive/refs/tags/${RELEASE}.zip" -o $(basename "https://github.com/kimai/kimai/archive/refs/tags/${RELEASE}.zip")
+    unzip -q "${RELEASE}".zip
+    mv kimai-"${RELEASE}" /opt/kimai
+    [ -d "$BACKUP_DIR/var" ] && cp -r "$BACKUP_DIR/var" /opt/kimai/
+    [ -f "$BACKUP_DIR/.env" ] && cp "$BACKUP_DIR/.env" /opt/kimai/
+    [ -f "$BACKUP_DIR/local.yaml" ] && cp "$BACKUP_DIR/local.yaml" /opt/kimai/config/packages/
+    rm -rf "$BACKUP_DIR"
+    cd /opt/kimai
+    $STD composer install --no-dev --optimize-autoloader
+    $STD bin/console kimai:update
+    echo "${RELEASE}" >/opt/${APP}_version.txt
+    msg_ok "Updated ${APP} to ${RELEASE}"
+
+    msg_info "Starting Apache2"
+    systemctl start apache2
+    msg_ok "Started Apache2"
+
+    msg_info "Setup Permissions"
+    chown -R :www-data /opt/*
+    chmod -R g+r /opt/*
+    chmod -R g+rw /opt/*
+    chown -R www-data:www-data /opt/*
+    chmod -R 777 /opt/*
+    msg_ok "Setup Permissions"
+
+    msg_info "Cleaning Up"
+    rm -rf "${RELEASE}".zip
+    rm -rf "$BACKUP_DIR"
+    msg_ok "Cleaned"
+    msg_ok "Updated Successfully"
+  else
+    msg_ok "No update required. ${APP} is already at ${RELEASE}"
+  fi
+  exit
 }
 
 start
@@ -100,5 +100,6 @@ build_container
 description
 
 msg_ok "Completed Successfully!\n"
-echo -e "${APP} Setup should be reachable by going to the following URL.
-         ${BL}http://${IP}${CL} \n"
+echo -e "${CREATING}${GN}${APP} setup has been successfully initialized!${CL}"
+echo -e "${INFO}${YW} Access it using the following URL:${CL}"
+echo -e "${TAB}${GATEWAY}${BGN}http://${IP}${CL}"

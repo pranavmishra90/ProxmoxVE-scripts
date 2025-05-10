@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 
-# Copyright (c) 2021-2024 tteck
+# Copyright (c) 2021-2025 tteck
 # Author: tteck
 # Co-Author: havardthom
-# License: MIT
-# https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+# License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+# Source: https://openwebui.com/
 
-source /dev/stdin <<< "$FUNCTIONS_FILE_PATH"
+source /dev/stdin <<<"$FUNCTIONS_FILE_PATH"
 color
 verb_ip6
 catch_errors
@@ -15,23 +15,22 @@ network_check
 update_os
 
 msg_info "Installing Dependencies"
-$STD apt-get install -y curl
-$STD apt-get install -y sudo
-$STD apt-get install -y mc
-$STD apt-get install -y gpg
-$STD apt-get install -y git
+$STD apt-get install -y \
+  gpg \
+  git \
+  ffmpeg
 msg_ok "Installed Dependencies"
 
-msg_info "Installing Python3 Dependencies"
+msg_info "Setup Python3"
 $STD apt-get install -y --no-install-recommends \
   python3 \
   python3-pip
-msg_ok "Installed Python3 Dependencies"
+msg_ok "Setup Python3"
 
 msg_info "Setting up Node.js Repository"
 mkdir -p /etc/apt/keyrings
 curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
-echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" >/etc/apt/sources.list.d/nodesource.list
+echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" >/etc/apt/sources.list.d/nodesource.list
 msg_ok "Set up Node.js Repository"
 
 msg_info "Installing Node.js"
@@ -78,7 +77,7 @@ RestartSec=3
 [Install]
 WantedBy=multi-user.target
 EOF
-  systemctl enable -q --now ollama.service
+  systemctl enable -q --now ollama
   sed -i 's/ENABLE_OLLAMA_API=false/ENABLE_OLLAMA_API=true/g' /opt/open-webui/.env
   msg_ok "Installed Ollama"
 fi
@@ -98,7 +97,7 @@ ExecStart=/opt/open-webui/backend/start.sh
 [Install]
 WantedBy=multi-user.target
 EOF
-systemctl enable -q --now open-webui.service
+systemctl enable -q --now open-webui
 msg_ok "Created Service"
 
 motd_ssh

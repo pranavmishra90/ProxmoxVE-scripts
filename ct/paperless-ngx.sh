@@ -2,63 +2,29 @@
 source <(curl -s https://raw.githubusercontent.com/pranavmishra90/ProxmoxVE/main/misc/build.func)
 # Copyright (c) 2021-2024 tteck
 # Author: tteck (tteckster)
-# License: MIT
-# https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+# License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+# Source: https://docs.paperless-ngx.com/
 
-function header_info {
-  clear
-  cat <<"EOF"
-    ____                        __                                     
-   / __ \____ _____  ___  _____/ /__  __________    ____  ____ __  __
-  / /_/ / __ `/ __ \/ _ \/ ___/ / _ \/ ___/ ___/___/ __ \/ __ `/ |/_/
- / ____/ /_/ / /_/ /  __/ /  / /  __(__  |__  )___/ / / / /_/ />  <  
-/_/    \__,_/ .___/\___/_/  /_/\___/____/____/   /_/ /_/\__, /_/|_|  
-           /_/                                         /____/        
- 
-EOF
-}
-header_info
-echo -e "Loading..."
 APP="Paperless-ngx"
-var_disk="10"
-var_cpu="2"
-var_ram="2048"
-var_os="debian"
-var_version="12"
+var_tags="${var_tags:-document;management}"
+var_cpu="${var_cpu:-2}"
+var_ram="${var_ram:-2048}"
+var_disk="${var_disk:-10}"
+var_os="${var_os:-debian}"
+var_version="${var_version:-12}"
+var_unprivileged="${var_unprivileged:-1}"
+
+header_info "$APP"
 variables
 color
 catch_errors
-
-function default_settings() {
-  CT_TYPE="1"
-  PW=""
-  CT_ID=$NEXTID
-  HN=$NSAPP
-  DISK_SIZE="$var_disk"
-  CORE_COUNT="$var_cpu"
-  RAM_SIZE="$var_ram"
-  BRG="vmbr0"
-  NET="dhcp"
-  GATE=""
-  APT_CACHER=""
-  APT_CACHER_IP=""
-  DISABLEIP6="no"
-  MTU=""
-  SD=""
-  NS=""
-  MAC=""
-  VLAN=""
-  SSH="no"
-  VERB="no"
-  echo_default
-}
 
 function update_script() {
   if [[ ! -d /opt/paperless ]]; then
     msg_error "No ${APP} Installation Found!"
     exit
   fi
-  RELEASE=$(curl -s https://api.github.com/repos/paperless-ngx/paperless-ngx/releases/latest | grep "tag_name" | awk '{print substr($2, 2, length($2)-3) }')
+  RELEASE=$(curl -fsSL https://api.github.com/repos/paperless-ngx/paperless-ngx/releases/latest | grep "tag_name" | awk '{print substr($2, 2, length($2)-3) }')
 
   UPD=$(whiptail --backtitle "Proxmox VE Helper Scripts" --title "SUPPORT" --radiolist --cancel-button Exit-Script "Spacebar = Select" 11 58 2 \
     "1" "Update Paperless-ngx to $RELEASE" ON \
@@ -69,15 +35,15 @@ function update_script() {
   check_container_resources
   if [ "$UPD" == "1" ]; then
     if [[ "${RELEASE}" != "$(cat /opt/${APP}_version.txt)" ]] || [[ ! -f /opt/${APP}_version.txt ]]; then
-	  if [[ "$(gs --version 2>/dev/null)" != "10.04.0" ]]; then
+      if [[ "$(gs --version 2>/dev/null)" != "10.04.0" ]]; then
         msg_info "Updating Ghostscript (Patience)"
         cd /tmp
-        wget -q https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs10040/ghostscript-10.04.0.tar.gz
+        curl -fsSL "https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs10040/ghostscript-10.04.0.tar.gz" -o $(basename "https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs10040/ghostscript-10.04.0.tar.gz")
         tar -xzf ghostscript-10.04.0.tar.gz
         cd ghostscript-10.04.0
-        ./configure &>/dev/null
-        make &>/dev/null
-        sudo make install &>/dev/null
+        $STD ./configure
+        $STD make
+        $STD sudo make install
         rm -rf /tmp/ghostscript*
         msg_ok "Ghostscript updated to 10.04.0"
       fi
@@ -87,14 +53,14 @@ function update_script() {
 
       msg_info "Updating to ${RELEASE}"
       cd ~
-      wget -q https://github.com/paperless-ngx/paperless-ngx/releases/download/$RELEASE/paperless-ngx-$RELEASE.tar.xz
+      curl -fsSL "https://github.com/paperless-ngx/paperless-ngx/releases/download/$RELEASE/paperless-ngx-$RELEASE.tar.xz" -o $(basename "https://github.com/paperless-ngx/paperless-ngx/releases/download/$RELEASE/paperless-ngx-$RELEASE.tar.xz")
       tar -xf paperless-ngx-$RELEASE.tar.xz
       cp -r /opt/paperless/paperless.conf paperless-ngx/
       cp -r paperless-ngx/* /opt/paperless/
       cd /opt/paperless
-      pip install -r requirements.txt &>/dev/null
+      $STD pip install -r requirements.txt
       cd /opt/paperless/src
-      /usr/bin/python3 manage.py migrate &>/dev/null
+      $STD /usr/bin/python3 manage.py migrate
       echo "${RELEASE}" >/opt/${APP}_version.txt
       msg_ok "Updated to ${RELEASE}"
 
@@ -125,5 +91,6 @@ build_container
 description
 
 msg_ok "Completed Successfully!\n"
-echo -e "${APP} should be reachable by going to the following URL.
-         ${BL}http://${IP}:8000${CL} \n"
+echo -e "${CREATING}${GN}${APP} setup has been successfully initialized!${CL}"
+echo -e "${INFO}${YW} Access it using the following URL:${CL}"
+echo -e "${TAB}${GATEWAY}${BGN}http://${IP}:8000${CL}"

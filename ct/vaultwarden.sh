@@ -2,55 +2,22 @@
 source <(curl -s https://raw.githubusercontent.com/pranavmishra90/ProxmoxVE/main/misc/build.func)
 # Copyright (c) 2021-2024 tteck
 # Author: tteck (tteckster)
-# License: MIT
-# https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+# License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+# Source: https://github.com/dani-garcia/vaultwarden
 
-function header_info {
-  clear
-  cat <<"EOF"
- _    __            ____ _       __               __         
-| |  / /___ ___  __/ / /| |     / /___ __________/ /__  ____ 
-| | / / __ `/ / / / / __/ | /| / / __ `/ ___/ __  / _ \/ __ \
-| |/ / /_/ / /_/ / / /_ | |/ |/ / /_/ / /  / /_/ /  __/ / / /
-|___/\__,_/\__,_/_/\__/ |__/|__/\__,_/_/   \__,_/\___/_/ /_/ 
-                                                             
-EOF
-}
-header_info
-echo -e "Loading..."
 APP="Vaultwarden"
-var_disk="6"
-var_cpu="4"
-var_ram="6144"
-var_os="debian"
-var_version="12"
+var_tags="${var_tags:-password-manager}"
+var_cpu="${var_cpu:-4}"
+var_ram="${var_ram:-6144}"
+var_disk="${var_disk:-6}"
+var_os="${var_os:-debian}"
+var_version="${var_version:-12}"
+var_unprivileged="${var_unprivileged:-1}"
+
+header_info "$APP"
 variables
 color
 catch_errors
-
-function default_settings() {
-  CT_TYPE="1"
-  PW=""
-  CT_ID=$NEXTID
-  HN=$NSAPP
-  DISK_SIZE="$var_disk"
-  CORE_COUNT="$var_cpu"
-  RAM_SIZE="$var_ram"
-  BRG="vmbr0"
-  NET="dhcp"
-  GATE=""
-  APT_CACHER=""
-  APT_CACHER_IP=""
-  DISABLEIP6="no"
-  MTU=""
-  SD=""
-  NS=""
-  MAC=""
-  VLAN=""
-  SSH="no"
-  VERB="no"
-  echo_default
-}
 
 function update_script() {
   header_info
@@ -60,11 +27,11 @@ function update_script() {
     msg_error "No ${APP} Installation Found!"
     exit
   fi
- 
-  VAULT=$(curl -s https://api.github.com/repos/dani-garcia/vaultwarden/releases/latest |
+
+  VAULT=$(curl -fsSL https://api.github.com/repos/dani-garcia/vaultwarden/releases/latest |
     grep "tag_name" |
     awk '{print substr($2, 2, length($2)-3) }')
-  WVRELEASE=$(curl -s https://api.github.com/repos/dani-garcia/bw_web_builds/releases/latest |
+  WVRELEASE=$(curl -fsSL https://api.github.com/repos/dani-garcia/bw_web_builds/releases/latest |
     grep "tag_name" |
     awk '{print substr($2, 2, length($2)-3) }')
 
@@ -81,9 +48,9 @@ function update_script() {
 
     msg_info "Updating VaultWarden to $VAULT (Patience)"
     cd ~ && rm -rf vaultwarden
-    git clone https://github.com/dani-garcia/vaultwarden &>/dev/null
+    $STD git clone https://github.com/dani-garcia/vaultwarden
     cd vaultwarden
-    cargo build --features "sqlite,mysql,postgresql" --release &>/dev/null
+    $STD cargo build --features "sqlite,mysql,postgresql" --release
     DIR=/usr/bin/vaultwarden
     if [ -d "$DIR" ]; then
       cp target/release/vaultwarden /usr/bin/
@@ -109,12 +76,12 @@ function update_script() {
     msg_ok "Stopped Vaultwarden"
 
     msg_info "Updating Web-Vault to $WVRELEASE"
-    curl -fsSLO https://github.com/dani-garcia/bw_web_builds/releases/download/$WVRELEASE/bw_web_$WVRELEASE.tar.gz &>/dev/null
-    tar -zxf bw_web_$WVRELEASE.tar.gz -C /opt/vaultwarden/ &>/dev/null
+    $STD curl -fsSLO https://github.com/dani-garcia/bw_web_builds/releases/download/"$WVRELEASE"/bw_web_"$WVRELEASE".tar.gz
+    $STD tar -zxf bw_web_"$WVRELEASE".tar.gz -C /opt/vaultwarden/
     msg_ok "Updated Web-Vault"
 
     msg_info "Cleaning up"
-    rm bw_web_$WVRELEASE.tar.gz
+    rm bw_web_"$WVRELEASE".tar.gz
     msg_ok "Cleaned"
 
     msg_info "Starting Vaultwarden"
@@ -126,8 +93,8 @@ function update_script() {
   if [ "$UPD" == "3" ]; then
     if NEWTOKEN=$(whiptail --backtitle "Proxmox VE Helper Scripts" --passwordbox "Set the ADMIN_TOKEN" 10 58 3>&1 1>&2 2>&3); then
       if [[ -z "$NEWTOKEN" ]]; then exit; fi
-      if ! command -v argon2 >/dev/null 2>&1; then apt-get install -y argon2 &>/dev/null; fi
-      TOKEN=$(echo -n ${NEWTOKEN} | argon2 "$(openssl rand -base64 32)" -t 2 -m 16 -p 4 -l 64 -e)
+      if ! command -v argon2 >/dev/null 2>&1; then $STD apt-get install -y argon2; fi
+      TOKEN=$(echo -n "${NEWTOKEN}" | argon2 "$(openssl rand -base64 32)" -t 2 -m 16 -p 4 -l 64 -e)
       sed -i "s|ADMIN_TOKEN=.*|ADMIN_TOKEN='${TOKEN}'|" /opt/vaultwarden/.env
       if [[ -f /opt/vaultwarden/data/config.json ]]; then
         sed -i "s|\"admin_token\":.*|\"admin_token\": \"${TOKEN}\"|" /opt/vaultwarden/data/config.json
@@ -143,5 +110,6 @@ build_container
 description
 
 msg_ok "Completed Successfully!\n"
-echo -e "${APP} should be reachable by going to the following URL.
-         ${BL}http://${IP}:8000${CL} \n"
+echo -e "${CREATING}${GN}${APP} setup has been successfully initialized!${CL}"
+echo -e "${INFO}${YW} Access it using the following URL:${CL}"
+echo -e "${TAB}${GATEWAY}${BGN}https://${IP}:8000${CL}"

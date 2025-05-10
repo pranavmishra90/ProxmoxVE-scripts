@@ -2,84 +2,65 @@
 source <(curl -s https://raw.githubusercontent.com/pranavmishra90/ProxmoxVE/main/misc/build.func)
 # Copyright (c) 2021-2024 tteck
 # Author: tteck (tteckster)
-# License: MIT
-# https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+# License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+# Source: https://triliumnext.github.io/Docs/
 
-function header_info {
-clear
-cat <<"EOF"
-  ______     _ ___               
- /_  __/____(_) (_)_  ______ ___ 
-  / / / ___/ / / / / / / __ `__ \
- / / / /  / / / / /_/ / / / / / /
-/_/ /_/  /_/_/_/\__,_/_/ /_/ /_/ 
-                                                                      
-EOF
-}
-header_info
-echo -e "Loading..."
 APP="Trilium"
-var_disk="2"
-var_cpu="1"
-var_ram="512"
-var_os="debian"
-var_version="12"
+var_tags="${var_tags:-notes}"
+var_cpu="${var_cpu:-1}"
+var_ram="${var_ram:-512}"
+var_disk="${var_disk:-2}"
+var_os="${var_os:-debian}"
+var_version="${var_version:-12}"
+var_unprivileged="${var_unprivileged:-1}"
+
+header_info "$APP"
 variables
 color
 catch_errors
 
-function default_settings() {
-  CT_TYPE="1"
-  PW=""
-  CT_ID=$NEXTID
-  HN=$NSAPP
-  DISK_SIZE="$var_disk"
-  CORE_COUNT="$var_cpu"
-  RAM_SIZE="$var_ram"
-  BRG="vmbr0"
-  NET="dhcp"
-  GATE=""
-  APT_CACHER=""
-  APT_CACHER_IP=""
-  DISABLEIP6="no"
-  MTU=""
-  SD=""
-  NS=""
-  MAC=""
-  VLAN=""
-  SSH="no"
-  VERB="no"
-  echo_default
-}
-
 function update_script() {
-header_info
-check_container_storage
-check_container_resources
-if [[ ! -d /opt/trilium ]]; then msg_error "No ${APP} Installation Found!"; exit; fi
-RELEASE=$(curl -s https://api.github.com/repos/TriliumNext/Notes/releases/latest | grep "tag_name" | awk '{print substr($2, 2, length($2)-3) }')
-    
-msg_info "Stopping ${APP}"
-systemctl stop trilium.service
-sleep 1
-msg_ok "Stopped ${APP}"
+  header_info
+  check_container_storage
+  check_container_resources
+  if [[ ! -d /opt/trilium ]]; then
+    msg_error "No ${APP} Installation Found!"
+    exit
+  fi
+  if [[ ! -f /opt/${APP}_version.txt ]]; then touch /opt/${APP}_version.txt; fi
+  RELEASE=$(curl -fsSL https://api.github.com/repos/TriliumNext/Notes/releases/latest | grep "tag_name" | awk '{print substr($2, 3, length($2)-4) }')
+  if [[ "v${RELEASE}" != "$(cat /opt/${APP}_version.txt)" ]] || [[ ! -f /opt/${APP}_version.txt ]]; then
+    msg_info "Stopping ${APP}"
+    systemctl stop trilium
+    sleep 1
+    msg_ok "Stopped ${APP}"
 
-msg_info "Updating to ${RELEASE}"
-wget -q https://github.com/TriliumNext/Notes/releases/download/${RELEASE}/TriliumNextNotes-${RELEASE}-server-linux-x64.tar.xz
-tar -xf TriliumNextNotes-${RELEASE}-server-linux-x64.tar.xz
-cp -r trilium-linux-x64-server/* /opt/trilium/
-msg_ok "Updated to ${RELEASE}"
+    msg_info "Updating to ${RELEASE}"
+    mkdir -p /opt/trilium_backup
+    mv /opt/trilium/db /opt/trilium_backup/
+    rm -rf /opt/trilium
+    cd /tmp
+    curl -fsSL "https://github.com/TriliumNext/Notes/releases/download/v${RELEASE}/TriliumNextNotes-Server-v${RELEASE}-linux-x64.tar.xz" -o $(basename "https://github.com/TriliumNext/Notes/releases/download/v${RELEASE}/TriliumNextNotes-Server-v${RELEASE}-linux-x64.tar.xz")
+    tar -xf TriliumNextNotes-Server-v${RELEASE}-linux-x64.tar.xz
+    mv TriliumNextNotes-Server-$RELEASE-linux-x64 /opt/trilium
+    cp -r /opt/trilium_backup/db /opt/trilium/
+    echo "v${RELEASE}" >/opt/${APP}_version.txt
+    msg_ok "Updated to ${RELEASE}"
 
-msg_info "Cleaning up"
-rm -rf TriliumNextNotes-${RELEASE}-server-linux-x64.tar.xz trilium-linux-x64-server
-msg_ok "Cleaned"
+    msg_info "Cleaning up"
+    rm -rf /tmp/TriliumNextNotes-Server-${RELEASE}-linux-x64.tar.xz
+    rm -rf /opt/trilium_backup
+    msg_ok "Cleaned"
 
-msg_info "Starting ${APP}"
-systemctl start trilium.service
-sleep 1
-msg_ok "Started ${APP}"
-msg_ok "Updated Successfully"
-exit
+    msg_info "Starting ${APP}"
+    systemctl start trilium
+    sleep 1
+    msg_ok "Started ${APP}"
+    msg_ok "Updated Successfully"
+  else
+    msg_ok "No update required. ${APP} is already at ${RELEASE}"
+  fi
+  exit
 }
 
 start
@@ -87,5 +68,6 @@ build_container
 description
 
 msg_ok "Completed Successfully!\n"
-echo -e "${APP} should be reachable by going to the following URL.
-         ${BL}http://${IP}:8080${CL} \n"
+echo -e "${CREATING}${GN}${APP} setup has been successfully initialized!${CL}"
+echo -e "${INFO}${YW} Access it using the following URL:${CL}"
+echo -e "${TAB}${GATEWAY}${BGN}http://${IP}:8080${CL}"

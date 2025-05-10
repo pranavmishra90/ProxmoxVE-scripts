@@ -2,68 +2,32 @@
 source <(curl -s https://raw.githubusercontent.com/pranavmishra90/ProxmoxVE/main/misc/build.func)
 # Copyright (c) 2021-2024 community-scripts ORG
 # Author: kristocopani
-# License: MIT
-# https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+# License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+# Source: https://lubelogger.com/
 
-function header_info {
-clear
-cat <<"EOF"
-    __          __         __                               
-   / /   __  __/ /_  ___  / /   ____  ____ _____ ____  _____
-  / /   / / / / __ \/ _ \/ /   / __ \/ __ `/ __ `/ _ \/ ___/
- / /___/ /_/ / /_/ /  __/ /___/ /_/ / /_/ / /_/ /  __/ /    
-/_____/\__,_/_.___/\___/_____/\____/\__, /\__, /\___/_/     
-                                   /____//____/             
-
-EOF
-}
-header_info
-echo -e "Loading..."
 APP="LubeLogger"
-var_disk="2"
-var_cpu="1"
-var_ram="512"
-var_os="debian"
-var_version="12"
+var_tags="${var_tags:-vehicle;car}"
+var_cpu="${var_cpu:-1}"
+var_ram="${var_ram:-512}"
+var_disk="${var_disk:-2}"
+var_os="${var_os:-debian}"
+var_version="${var_version:-12}"
+var_unprivileged="${var_unprivileged:-1}"
+
+header_info "$APP"
 variables
 color
 catch_errors
 
-function default_settings() {
-  CT_TYPE="1"
-  PW=""
-  CT_ID=$NEXTID
-  HN=$NSAPP
-  DISK_SIZE="$var_disk"
-  CORE_COUNT="$var_cpu"
-  RAM_SIZE="$var_ram"
-  BRG="vmbr0"
-  NET="dhcp"
-  GATE=""
-  APT_CACHER=""
-  APT_CACHER_IP=""
-  DISABLEIP6="no"
-  MTU=""
-  SD=""
-  NS=""
-  MAC=""
-  VLAN=""
-  SSH="no"
-  VERB="no"
-  echo_default
-}
-
 function update_script() {
-header_info
-check_container_storage
-check_container_resources
-
+  header_info
+  check_container_storage
+  check_container_resources
   if [[ ! -f /etc/systemd/system/lubelogger.service ]]; then
     msg_error "No ${APP} Installation Found!"
     exit
   fi
-
-  RELEASE=$(curl -s https://api.github.com/repos/hargata/lubelog/releases/latest | grep "tag_name" | awk '{print substr($2, 3, length($2)-4) }')
+  RELEASE=$(curl -fsSL https://api.github.com/repos/hargata/lubelog/releases/latest | grep "tag_name" | awk '{print substr($2, 3, length($2)-4) }')
   RELEASE_TRIMMED=$(echo "${RELEASE}" | tr -d ".")
   if [[ ! -f /opt/${APP}_version.txt ]] || [[ "${RELEASE}" != "$(cat /opt/${APP}_version.txt)" ]]; then
     msg_info "Stopping Service"
@@ -72,12 +36,23 @@ check_container_resources
 
     msg_info "Updating ${APP} to v${RELEASE}"
     cd /opt
-    wget -q https://github.com/hargata/lubelog/releases/download/v${RELEASE}/LubeLogger_v${RELEASE_TRIMMED}_linux_x64.zip
-    cp /opt/lubelogger/appsettings.json /opt/appsettings.json
+    curl -fsSL "https://github.com/hargata/lubelog/releases/download/v${RELEASE}/LubeLogger_v${RELEASE_TRIMMED}_linux_x64.zip" -o $(basename "https://github.com/hargata/lubelog/releases/download/v${RELEASE}/LubeLogger_v${RELEASE_TRIMMED}_linux_x64.zip")
+    mkdir -p /tmp/lubeloggerData/data
+    cp /opt/lubelogger/appsettings.json /tmp/lubeloggerData/appsettings.json
+    cp -r /opt/lubelogger/data/ /tmp/lubeloggerData/
+
+    # Lubelogger has moved multiples folders to the 'data' folder, and we need to move them before the update to keep the user data
+    # Github Discussion: https://github.com/hargata/lubelog/discussions/787
+    [[ -e /opt/lubelogger/config ]] && cp -r /opt/lubelogger/config /tmp/lubeloggerData/data/
+    [[ -e /opt/lubelogger/wwwroot/translations ]] && cp -r /opt/lubelogger/wwwroot/translations /tmp/lubeloggerData/data/
+    [[ -e /opt/lubelogger/wwwroot/documents ]] && cp -r /opt/lubelogger/wwwroot/documents /tmp/lubeloggerData/data/
+    [[ -e /opt/lubelogger/wwwroot/images ]] && cp -r /opt/lubelogger/wwwroot/images /tmp/lubeloggerData/data/
+    [[ -e /opt/lubelogger/wwwroot/temp ]] && cp -r /opt/lubelogger/wwwroot/temp /tmp/lubeloggerData/data/
+    [[ -e /opt/lubelogger/log ]] && cp -r /opt/lubelogger/log /tmp/lubeloggerData/
     rm -rf /opt/lubelogger
     unzip -qq LubeLogger_v${RELEASE_TRIMMED}_linux_x64.zip -d lubelogger
     chmod 700 /opt/lubelogger/CarCareTracker
-    mv -f /opt/appsettings.json /opt/lubelogger/appsettings.json
+    cp -rf /tmp/lubeloggerData/* /opt/lubelogger/
     echo "${RELEASE}" >"/opt/${APP}_version.txt"
     msg_ok "Updated ${APP} to v${RELEASE}"
 
@@ -87,6 +62,7 @@ check_container_resources
 
     msg_info "Cleaning up"
     rm -rf /opt/LubeLogger_v${RELEASE_TRIMMED}_linux_x64.zip
+    rm -rf /tmp/lubeloggerData
     msg_ok "Cleaned"
     msg_ok "Updated Successfully"
   else
@@ -100,5 +76,6 @@ build_container
 description
 
 msg_ok "Completed Successfully!\n"
-echo -e "${APP} should be reachable by going to the following URL.
-         ${BL}http://${IP}:5000${CL} \n"
+echo -e "${CREATING}${GN}${APP} setup has been successfully initialized!${CL}"
+echo -e "${INFO}${YW} Access it using the following URL:${CL}"
+echo -e "${TAB}${GATEWAY}${BGN}http://${IP}:5000${CL}"

@@ -2,77 +2,47 @@
 source <(curl -s https://raw.githubusercontent.com/pranavmishra90/ProxmoxVE/main/misc/build.func)
 # Copyright (c) 2021-2024 tteck
 # Author: tteck (tteckster)
-# License: MIT
-# https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+# License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+# Source: https://esphome.io/
 
-function header_info {
-clear
-cat <<"EOF"
-    ___________ ____  __  __                   
-   / ____/ ___// __ \/ / / /___  ____ ___  ___ 
-  / __/  \__ \/ /_/ / /_/ / __ \/ __ `__ \/ _ \
- / /___ ___/ / ____/ __  / /_/ / / / / / /  __/
-/_____//____/_/   /_/ /_/\____/_/ /_/ /_/\___/ 
-                                               
-EOF
-}
-header_info
-echo -e "Loading..."
 APP="ESPHome"
-var_disk="4"
-var_cpu="2"
-var_ram="1024"
-var_os="debian"
-var_version="12"
+var_tags="${var_tags:-automation}"
+var_cpu="${var_cpu:-2}"
+var_ram="${var_ram:-1024}"
+var_disk="${var_disk:-4}"
+var_os="${var_os:-debian}"
+var_version="${var_version:-12}"
+var_unprivileged="${var_unprivileged:-1}"
+
+header_info "$APP"
 variables
 color
 catch_errors
 
-function default_settings() {
-  CT_TYPE="1"
-  PW=""
-  CT_ID=$NEXTID
-  HN=$NSAPP
-  DISK_SIZE="$var_disk"
-  CORE_COUNT="$var_cpu"
-  RAM_SIZE="$var_ram"
-  BRG="vmbr0"
-  NET="dhcp"
-  GATE=""
-  APT_CACHER=""
-  APT_CACHER_IP=""
-  DISABLEIP6="no"
-  MTU=""
-  SD=""
-  NS=""
-  MAC=""
-  VLAN=""
-  SSH="no"
-  VERB="no"
-  echo_default
-}
-
 function update_script() {
-header_info
-check_container_storage
-check_container_resources
-if [[ ! -f /etc/systemd/system/esphomeDashboard.service ]]; then msg_error "No ${APP} Installation Found!"; exit; fi
-msg_info "Stopping ESPHome"
-systemctl stop esphomeDashboard
-msg_ok "Stopped ESPHome"
+  header_info
+  check_container_storage
+  check_container_resources
+  if [[ ! -f /etc/systemd/system/esphomeDashboard.service ]]; then
+    msg_error "No ${APP} Installation Found!"
+    exit
+  fi
+  msg_info "Stopping ESPHome"
+  systemctl stop esphomeDashboard
+  msg_ok "Stopped ESPHome"
 
-msg_info "Updating ESPHome"
-if [[ -d /srv/esphome ]]; then
-  source /srv/esphome/bin/activate &>/dev/null
-fi
-pip3 install -U esphome &>/dev/null
-msg_ok "Updated ESPHome"
+  msg_info "Updating ESPHome"
+  if [[ -d /srv/esphome ]]; then
+    $STD source /srv/esphome/bin/activate
+  fi
+  $STD pip3 install -U esphome
+  msg_ok "Updated ESPHome"
 
-msg_info "Starting ESPHome"
-systemctl start esphomeDashboard
-msg_ok "Started ESPHome"
-msg_ok "Updated Successfully"
-exit
+  msg_info "Starting ESPHome"
+  systemctl start esphomeDashboard
+  msg_ok "Started ESPHome"
+  msg_ok "Updated Successfully"
+  exit
 }
 
 start
@@ -80,5 +50,6 @@ build_container
 description
 
 msg_ok "Completed Successfully!\n"
-echo -e "${APP} should be reachable by going to the following URL.
-         ${BL}http://${IP}:6052${CL} \n"
+echo -e "${CREATING}${GN}${APP} setup has been successfully initialized!${CL}"
+echo -e "${INFO}${YW} Access it using the following URL:${CL}"
+echo -e "${TAB}${GATEWAY}${BGN}http://${IP}:6052${CL}"

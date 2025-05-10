@@ -2,56 +2,22 @@
 source <(curl -s https://raw.githubusercontent.com/pranavmishra90/ProxmoxVE/main/misc/build.func)
 # Copyright (c) 2021-2024 tteck
 # Author: tteck (tteckster)
-# License: MIT
-# https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+# License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+# Source: https://www.docker.com/
 
-function header_info {
-  clear
-  cat <<"EOF"
-    ____             __            
-   / __ \____  _____/ /_  __  _____
-  / / / / __ \/ ___/ //_/ _ \/ ___/
- / /_/ / /_/ / /__/ ,< /  __/ /    
-/_____/\____/\___/_/|_|\___/_/     
- Alpine
- 
-EOF
-}
-header_info
-echo -e "Loading..."
 APP="Alpine-Docker"
-var_disk="2"
-var_cpu="1"
-var_ram="1024"
-var_os="alpine"
-var_version="3.19"
+var_tags="${var_tags:-docker;alpine}"
+var_cpu="${var_cpu:-1}"
+var_ram="${var_ram:-1024}"
+var_disk="${var_disk:-2}"
+var_os="${var_os:-alpine}"
+var_version="${var_version:-3.21}"
+var_unprivileged="${var_unprivileged:-1}"
+
+header_info "$APP"
 variables
 color
 catch_errors
-
-function default_settings() {
-  CT_TYPE="1"
-  PW=""
-  CT_ID=$NEXTID
-  HN=$NSAPP
-  DISK_SIZE="$var_disk"
-  CORE_COUNT="$var_cpu"
-  RAM_SIZE="$var_ram"
-  BRG="vmbr0"
-  NET="dhcp"
-  GATE=""
-  APT_CACHER=""
-  APT_CACHER_IP=""
-  DISABLEIP6="no"
-  MTU=""
-  SD=""
-  NS=""
-  MAC=""
-  VLAN=""
-  SSH="no"
-  VERB="no"
-  echo_default
-}
 
 function update_script() {
   if ! apk -e info newt >/dev/null 2>&1; then

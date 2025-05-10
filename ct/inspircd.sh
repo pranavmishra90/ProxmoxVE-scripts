@@ -2,66 +2,32 @@
 source <(curl -s https://raw.githubusercontent.com/pranavmishra90/ProxmoxVE/main/misc/build.func)
 # Copyright (c) 2021-2024 community-scripts ORG
 # Author: kristocopani
-# License: MIT
-# https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+# License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+# Source: https://www.inspircd.org/
 
-function header_info {
-clear
-cat <<"EOF"
-    ____                 ________  ______    __
-   /  _/___  _________  /  _/ __ \/ ____/___/ /
-   / // __ \/ ___/ __ \ / // /_/ / /   / __  / 
- _/ // / / (__  ) /_/ // // _, _/ /___/ /_/ /  
-/___/_/ /_/____/ .___/___/_/ |_|\____/\__,_/   
-              /_/                              
- 
-EOF
-}
-header_info
-echo -e "Loading..."
 APP="InspIRCd"
-var_disk="2"
-var_cpu="1"
-var_ram="512"
-var_os="debian"
-var_version="12"
+var_tags="${var_tags:-IRC}"
+var_cpu="${var_cpu:-1}"
+var_ram="${var_ram:-512}"
+var_disk="${var_disk:-2}"
+var_os="${var_os:-debian}"
+var_version="${var_version:-12}"
+var_unprivileged="${var_unprivileged:-1}"
+
+header_info "$APP"
 variables
 color
 catch_errors
-
-function default_settings() {
-  CT_TYPE="1"
-  PW=""
-  CT_ID=$NEXTID
-  HN=$NSAPP
-  DISK_SIZE="$var_disk"
-  CORE_COUNT="$var_cpu"
-  RAM_SIZE="$var_ram"
-  BRG="vmbr0"
-  NET="dhcp"
-  GATE=""
-  APT_CACHER=""
-  APT_CACHER_IP=""
-  DISABLEIP6="no"
-  MTU=""
-  SD=""
-  NS=""
-  MAC=""
-  VLAN=""
-  SSH="no"
-  VERB="no"
-  echo_default
-}
 function update_script() {
-header_info
-check_container_storage
-check_container_resources
+  header_info
+  check_container_storage
+  check_container_resources
 
   if [[ ! -f /lib/systemd/system/inspircd.service ]]; then
     msg_error "No ${APP} Installation Found!"
     exit
   fi
-  RELEASE=$(curl -s https://api.github.com/repos/inspircd/inspircd/releases/latest | grep "tag_name" | awk '{print substr($2, 3, length($2)-4) }')
+  RELEASE=$(curl -fsSL https://api.github.com/repos/inspircd/inspircd/releases/latest | grep "tag_name" | awk '{print substr($2, 3, length($2)-4) }')
   if [[ ! -f /opt/${APP}_version.txt ]] || [[ "${RELEASE}" != "$(cat /opt/${APP}_version.txt)" ]]; then
     msg_info "Stopping Service"
     systemctl stop inspircd
@@ -69,8 +35,8 @@ check_container_resources
 
     msg_info "Updating ${APP} to v${RELEASE}"
     cd /opt
-    wget -q https://github.com/inspircd/inspircd/releases/download/v${RELEASE}/inspircd_${RELEASE}.deb12u1_amd64.deb
-    apt-get install "./inspircd_${RELEASE}.deb12u1_amd64.deb" -y &>/dev/nul
+    curl -fsSL "https://github.com/inspircd/inspircd/releases/download/v${RELEASE}/inspircd_${RELEASE}.deb12u1_amd64.deb" -o $(basename "https://github.com/inspircd/inspircd/releases/download/v${RELEASE}/inspircd_${RELEASE}.deb12u1_amd64.deb")
+    $STD apt-get install "./inspircd_${RELEASE}.deb12u1_amd64.deb" -y
     echo "${RELEASE}" >"/opt/${APP}_version.txt"
     msg_ok "Updated ${APP} to v${RELEASE}"
 
@@ -93,5 +59,6 @@ build_container
 description
 
 msg_ok "Completed Successfully!\n"
-echo -e "${APP} server should be reachable by connecting to the following server.
-         ${BL}Server Name:${IP} Port:6667${CL} \n"
+echo -e "${CREATING}${GN}${APP} setup has been successfully initialized!${CL}"
+echo -e "${INFO}${YW} Server-Acces it using the following URL:${CL}"
+echo -e "${TAB}${GATEWAY}${BGN}${IP}:6667${CL}"
