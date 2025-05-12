@@ -40,6 +40,7 @@ fi
 
 ERROR_COUNT=0
 FILES=$(find . -name "*.sh")
+FILES=$FILES + $(find . -name "*.func")
 
 function fix_fork_urls() {
     local file="$1"
