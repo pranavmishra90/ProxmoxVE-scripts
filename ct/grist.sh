@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/build.func)
+source <(curl -fsSL https://raw.githubusercontent.com/pranavmishra90/ProxmoxVE/main/misc/build.func)
 # Source: https://github.com/gristlabs/grist-core
 
 APP="Grist"
@@ -39,7 +39,7 @@ function update_script() {
     rm -rf grist_bak
     mv grist grist_bak
     curl -fsSL "https://github.com/gristlabs/grist-core/archive/refs/tags/v${RELEASE}.zip" -o $(basename "https://github.com/gristlabs/grist-core/archive/refs/tags/v${RELEASE}.zip")
-    unzip -q v$RELEASE.zip
+    $STD unzip v$RELEASE.zip
     mv grist-core-${RELEASE} grist
 
     mkdir -p grist/docs

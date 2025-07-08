@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/build.func)
+source <(curl -fsSL https://raw.githubusercontent.com/pranavmishra90/ProxmoxVE/main/misc/build.func)
 # Copyright (c) 2021-2025 community-scripts ORG
 # Author: vhsdream
 # License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
@@ -39,8 +39,8 @@ function update_script() {
         cp /opt/fluid-calendar/.env /opt/fluid.env
         rm -rf /opt/fluid-calendar
         tmp_file=$(mktemp)
-curl -fsSL "https://github.com/dotnetfactory/fluid-calendar/archive/refs/tags/v${RELEASE}.zip" -o "$tmp_file"
-        unzip -q $tmp_file
+        curl -fsSL "https://github.com/dotnetfactory/fluid-calendar/archive/refs/tags/v${RELEASE}.zip" -o "$tmp_file"
+        $STD unzip $tmp_file
         mv ${APP}-${RELEASE}/ /opt/fluid-calendar
         mv /opt/fluid.env /opt/fluid-calendar/.env
         cd /opt/fluid-calendar

@@ -14,32 +14,28 @@ network_check
 update_os
 
 msg_info "Installing Dependencies"
-$STD apt-get install -y \
-    postgresql \
-    apache2 \
-    libapache2-mod-php \
-    php-{pgsql,dom}
+$STD apt-get install -y apache2
 msg_ok "Installed Dependencies"
 
-msg_info "Setting up PostgreSQL"
+PG_VERSION="16" setup_postgresql
+PHP_APACHE="YES" PHP_MODULE="pgsql, dom" PHP_VERSION="8.2" setup_php
+fetch_and_deploy_gh_release "baikal" "sabre-io/Baikal"
+
+msg_info "Setting up PostgreSQL Database"
 DB_NAME=baikal
 DB_USER=baikal
 DB_PASS=$(openssl rand -base64 18 | tr -dc 'a-zA-Z0-9' | cut -c1-13)
 $STD sudo -u postgres psql -c "CREATE ROLE $DB_USER WITH LOGIN PASSWORD '$DB_PASS';"
 $STD sudo -u postgres psql -c "CREATE DATABASE $DB_NAME WITH OWNER $DB_USER TEMPLATE template0;"
 {
-    echo "Baikal Credentials"
-    echo "Baikal Database User: $DB_USER"
-    echo "Baikal Database Password: $DB_PASS"
-    echo "Baikal Database Name: $DB_NAME"
+  echo "Baikal Credentials"
+  echo "Baikal Database User: $DB_USER"
+  echo "Baikal Database Password: $DB_PASS"
+  echo "Baikal Database Name: $DB_NAME"
 } >>~/baikal.creds
-msg_ok "Set up PostgreSQL"
+msg_ok "Set up PostgreSQL Database"
 
-msg_info "Installing Baikal"
-RELEASE=$(curl -fsSL https://api.github.com/repos/sabre-io/Baikal/releases/latest | grep "tag_name" | awk '{print substr($2, 2, length($2)-3) }')
-cd /opt
-curl -fsSL "https://github.com/sabre-io/baikal/releases/download/${RELEASE}/baikal-${RELEASE}.zip" -o $(basename "https://github.com/sabre-io/baikal/releases/download/${RELEASE}/baikal-${RELEASE}.zip")
-unzip -q "baikal-${RELEASE}.zip"
+msg_info "Configuring Baikal"
 cat <<EOF >/opt/baikal/config/baikal.yaml
 database:
     backend: pgsql
@@ -50,7 +46,6 @@ database:
 EOF
 chown -R www-data:www-data /opt/baikal/
 chmod -R 755 /opt/baikal/
-echo "${RELEASE}" >/opt/${APPLICATION}_version.txt
 msg_ok "Installed Baikal"
 
 msg_info "Creating Service"
@@ -89,7 +84,6 @@ motd_ssh
 customize
 
 msg_info "Cleaning up"
-rm -rf "/opt/baikal-${RELEASE}.zip"
 $STD apt-get -y autoremove
 $STD apt-get -y autoclean
 msg_ok "Cleaned"
