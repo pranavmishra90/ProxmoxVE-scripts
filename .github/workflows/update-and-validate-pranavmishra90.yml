@@ -83,7 +83,7 @@ jobs:
         run: |
           echo "Disabling commit signing for dry run mode."
           git config --global commit.gpgsign false
-          git config --global tag.gpgSign true
+          git config --global tag.gpgSign false
 
       - name: Create Pull Request
         id: create_pr
@@ -97,5 +97,6 @@ jobs:
             - Permissions have been fixed.
 
           base: main
-          commit-message: "ci: date stamp"
+          commit-message: "ci(automated): update scripts from upstream - ${{ env.timestamp }}"
+          sign-commits: true
           branch: "feat/update-${{ env.timestamp }}"
