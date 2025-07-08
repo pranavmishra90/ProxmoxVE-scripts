@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/build.func)
+source <(curl -fsSL https://raw.githubusercontent.com/pranavmishra90/ProxmoxVE/main/misc/build.func)
 # Copyright (c) 2021-2025 community-scripts ORG
 # Author: vhsdream
 # License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
@@ -39,7 +39,7 @@ function update_script() {
         res_tmp=$(mktemp)
         rm -rf /opt/${APP}
         curl -fsSL "https://github.com/AmruthPillai/Reactive-Resume/archive/refs/tags/v${RELEASE}.zip" -O $res_tmp
-        unzip -q $res_tmp
+        $STD unzip $res_tmp
         mv ${APP}-${RELEASE}/ /opt/${APP}
         cd /opt/${APP}
         export PUPPETEER_SKIP_DOWNLOAD="true"
@@ -66,7 +66,7 @@ function update_script() {
         brwsr_tmp=$(mktemp)
         TAG=$(curl -fsSL https://api.github.com/repos/browserless/browserless/tags?per_page=1 | grep "name" | awk '{print substr($2, 3, length($2)-4) }')
         curl -fsSL https://github.com/browserless/browserless/archive/refs/tags/v${TAG}.zip -O $brwsr_tmp
-        unzip -q $brwsr_tmp
+        $STD unzip $brwsr_tmp
         mv browserless-${TAG}/ /opt/browserless
         cd /opt/browserless
         $STD npm install

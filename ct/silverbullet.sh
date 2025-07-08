@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/build.func)
+source <(curl -fsSL https://raw.githubusercontent.com/pranavmishra90/ProxmoxVE/main/misc/build.func)
 # Copyright (c) 2021-2025 community-scripts ORG
 # Author: Dominik Siebel (dsiebel)
 # License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
@@ -34,7 +34,7 @@ function update_script() {
 
     msg_info "Updating ${APP} to v${RELEASE}"
     curl -fsSL "https://github.com/silverbulletmd/silverbullet/releases/download/${RELEASE}/silverbullet-server-linux-x86_64.zip" -o $(basename "https://github.com/silverbulletmd/silverbullet/releases/download/${RELEASE}/silverbullet-server-linux-x86_64.zip")
-    unzip -q silverbullet-server-linux-x86_64.zip
+    $STD unzip silverbullet-server-linux-x86_64.zip
     mv silverbullet /opt/silverbullet/bin/
     chmod +x /opt/silverbullet/bin/silverbullet
     echo "${RELEASE}" >/opt/silverbullet/${APP}_version.txt

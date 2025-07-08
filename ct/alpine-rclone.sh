@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/build.func)
+source <(curl -fsSL https://raw.githubusercontent.com/pranavmishra90/ProxmoxVE/main/misc/build.func)
 # Copyright (c) 2021-2025 community-scripts ORG
 # Author: Slaviša Arežina (tremor021)
 # License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
@@ -11,8 +11,9 @@ var_cpu="${var_cpu:-1}"
 var_ram="${var_ram:-256}"
 var_disk="${var_disk:-1}"
 var_os="${var_os:-alpine}"
-var_version="${var_version:-3.21}"
+var_version="${var_version:-3.22}"
 var_unprivileged="${var_unprivileged:-1}"
+var_fuse="${var_fuse:-yes}"
 
 header_info "$APP"
 variables
@@ -21,14 +22,10 @@ catch_errors
 
 function update_script() {
   header_info
-  check_container_storage
-  check_container_resources
-
   if [ ! -d /opt/rclone ]; then
     msg_error "No ${APP} Installation Found!"
     exit 1
   fi
-
   RELEASE=$(curl -s https://api.github.com/repos/rclone/rclone/releases/latest | grep "tag_name" | awk '{print substr($2, 3, length($2)-4) }')
   if [ "${RELEASE}" != "$(cat /opt/rclone_version.txt)" ] || [ ! -f /opt/rclone_version.txt ]; then
     msg_info "Updating ${APP} LXC"

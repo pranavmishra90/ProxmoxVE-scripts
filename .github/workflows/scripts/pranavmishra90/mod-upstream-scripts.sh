@@ -66,8 +66,8 @@ FILES=$(find . -name "*.sh" -o -name "*.func")
 
 function fix_fork_urls() {
     local file="$1"
-    if grep -q "githubusercontent.com/community-scripts/ProxmoxVE" "$file"; then
-        sed -i 's|githubusercontent.com/community-scripts/ProxmoxVE|githubusercontent.com/pranavmishra90/ProxmoxVE|g' "$file"
+    if grep -q "githubusercontent.com/pranavmishra90/ProxmoxVE" "$file"; then
+        sed -i 's|githubusercontent.com/pranavmishra90/ProxmoxVE|githubusercontent.com/pranavmishra90/ProxmoxVE|g' "$file"
         echo "[INFO] ✅ Updated URLs in: $file"
     fi
 }

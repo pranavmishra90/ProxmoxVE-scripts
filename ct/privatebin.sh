@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/build.func)
+source <(curl -fsSL https://raw.githubusercontent.com/pranavmishra90/ProxmoxVE/main/misc/build.func)
 # Copyright (c) 2021-2025 community-scripts ORG
 # Author: Nícolas Pastorello (opastorello)
 # License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
@@ -33,7 +33,7 @@ function update_script() {
     echo "${RELEASE}" >/opt/${APP}_version.txt
     cp -f /opt/privatebin/cfg/conf.php /tmp/privatebin_conf.bak
     curl -fsSL "https://github.com/PrivateBin/PrivateBin/archive/refs/tags/${RELEASE}.zip" -o $(basename "https://github.com/PrivateBin/PrivateBin/archive/refs/tags/${RELEASE}.zip")
-    unzip -q ${RELEASE}.zip
+    $STD unzip ${RELEASE}.zip
     rm -rf /opt/privatebin/*
     mv PrivateBin-${RELEASE}/* /opt/privatebin/
     mv /tmp/privatebin_conf.bak /opt/privatebin/cfg/conf.php
