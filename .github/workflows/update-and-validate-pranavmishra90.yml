@@ -131,8 +131,3 @@ jobs:
             This PR updates the scripts from the upstream repository.  
             - URLs have been modified to this fork.
             - Permissions have been fixed.
-
-          base: main
-          commit-message: "ci(automated): update scripts from upstream - ${{ env.timestamp }}"
-          sign-commits: true
-          branch: "feat/update-${{ env.timestamp }}"
