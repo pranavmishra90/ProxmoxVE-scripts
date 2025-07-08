@@ -4,7 +4,26 @@
 DATE=$(date +%Y-%m-%d)
 BRANCH_NAME="feat/update-$DATE"
 
-cd ProxmoxVE
+SSH_KEY=$SSH_KEY
+
+if ! ssh-add -l | grep -q "ED25519"; then
+  echo "No SSH key found in agent. Trying to restart the ssh-agent."
+  eval "$(ssh-agent -s)"
+  ssh-add - <<< "${SSH_KEY}"
+fi
+
+if ! ssh-add -l | grep -q "ED25519"; then
+  echo "No SSH key found in agent. Disabling commit signing."
+  git config --global --unset user.signingkey
+  git config --global --unset gpg.format
+  git config --global --unset commit.gpgsign 
+  git config --global --unset tag.gpgSign
+else
+  echo "SSH key found in agent. Enabling commit signing."
+  git config --global user.signingkey "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMDWKiAKIWUAAamY9AjUUCCE6yisHJpUowmpqhh9dJmQ Automated_Signature-Pranav_Mishra"
+  git config --global gpg.format ssh
+  git config --global commit.gpgsign true
+fi
 
 # git clone git@github.com:pranavmishra90/ProxmoxVE.git
 git config advice.setUpstreamFailure false
