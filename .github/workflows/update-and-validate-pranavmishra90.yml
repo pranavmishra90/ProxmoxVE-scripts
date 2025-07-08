@@ -126,6 +126,8 @@ jobs:
         if: env.DRY_RUN != 'true'
         uses: peter-evans/create-pull-request@v7
         with:
+          base: main
+          branch: "ci/PR-${{ env.timestamp }}"
           title: "Updated scripts from upstream [${{ env.timestamp }}]"
           body: |
             This PR updates the scripts from the upstream repository.  
