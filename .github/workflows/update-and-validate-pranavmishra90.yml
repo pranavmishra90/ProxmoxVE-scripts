@@ -94,12 +94,7 @@ jobs:
           git push -v -u origin ${BRANCH_NAME}
           git pull -v origin ${BRANCH_NAME}
 
-      - name: Get the branch name
-        id: get_branch_name
-        run: |
-          DATE=$(date +%Y-%m-%d)
-          BRANCH_NAME="feat/update-$DATE"
-          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+
       - name: Add a date stamp
         id: date_stamp
         run: |
