@@ -124,12 +124,13 @@ jobs:
       - name: Create Pull Request
         id: create_pr
         if: env.DRY_RUN != 'true'
-        uses: peter-evans/create-pull-request@v7
-        with:
-          base: main
-          branch: "ci/PR-${{ env.timestamp }}"
-          title: "Updated scripts from upstream [${{ env.timestamp }}]"
-          body: |
-            This PR updates the scripts from the upstream repository.  
-            - URLs have been modified to this fork.
-            - Permissions have been fixed.
+        run: |
+          gh pr create --base main \
+          --head $(git branch --show-current) \
+          --title "Updated scripts from upstream [${{ env.timestamp }}]" \
+          --body """
+This PR updates the scripts from the upstream repository.
+
+  - URLs have been modified to this fork.
+  - Permissions have been fixed.
+  """
