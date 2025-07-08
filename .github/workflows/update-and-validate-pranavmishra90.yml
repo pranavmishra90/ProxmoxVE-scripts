@@ -31,6 +31,8 @@ jobs:
       - name: Setup | Force correct release branch on workflow SHA
         run: |
           git checkout -B ${{ github.ref_name }}
+
+      - name: Setup | Configure Git
           git config --global user.email "62562712+pranavmishra90@users.noreply.github.com"
           git config --global user.name "Pranav Kumar Mishra"
 
@@ -74,6 +76,13 @@ jobs:
       - name: Log Dry-Run Status
         run: |
           echo "Dry run mode is set to: $DRY_RUN"
+
+      - name: Disable Commit Signing
+        if: env.DRY_RUN == 'true'
+        run: |
+          echo "Disabling commit signing for dry run mode."
+          git config --global commit.gpgsign false
+          git config --global tag.gpgSign true
 
       - name: Create Pull Request
         id: create_pr
