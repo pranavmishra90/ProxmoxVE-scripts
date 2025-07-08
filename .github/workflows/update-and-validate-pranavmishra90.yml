@@ -27,7 +27,7 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.sha }}
           ssh-key: ${{ secrets.AUTOMATED_PRANAVMISHRA90_SSHKEY }}
-          
+
       - name: Setup | Force correct release branch on workflow SHA
         run: |
           git checkout -B ${{ github.ref_name }}
@@ -67,8 +67,6 @@ jobs:
           echo "timestamp=$DATESTAMP" >> $GITHUB_ENV
           echo "Generated timestamp: $DATESTAMP"
 
-
-
   create-pr:
     name: Create Pull Request
     needs: update-and-validate
@@ -81,7 +79,7 @@ jobs:
           DATE=$(date +%Y-%m-%d)
           BRANCH_NAME="feat/update-$DATE"
           echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
-          
+
       - name: Setup | Checkout Repository at workflow sha
         uses: actions/checkout@v4
         with:
@@ -94,12 +92,11 @@ jobs:
           git push -v -u origin ${BRANCH_NAME}
           git pull -v origin ${BRANCH_NAME}
 
-
       - name: Add a date stamp
         id: date_stamp
         run: |
           DATESTAMP=$(date +%Y-%m-%d)
-          
+
           echo "timestamp=$DATESTAMP" >> $GITHUB_ENV
           echo "Generated timestamp: $DATESTAMP"
 
@@ -128,9 +125,4 @@ jobs:
           gh pr create --base main \
           --head $(git branch --show-current) \
           --title "Updated scripts from upstream [${{ env.timestamp }}]" \
-          --body """
-This PR updates the scripts from the upstream repository.
-
-  - URLs have been modified to this fork.
-  - Permissions have been fixed.
-  """
+          --body "This PR updates the scripts from the upstream repository.\n\n  - URLs have been modified to this fork. \n  - Permissions have been fixed."
