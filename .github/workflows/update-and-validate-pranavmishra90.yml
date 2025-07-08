@@ -31,6 +31,25 @@ jobs:
       - name: Setup | Force correct release branch on workflow SHA
         run: |
           git checkout -B ${{ github.ref_name }}
+          git config --global user.email "62562712+pranavmishra90@users.noreply.github.com"
+          git config --global user.name "Pranav Kumar Mishra"
+
+          if ! ssh-add -l | grep -q "ED25519"; then
+            echo "No SSH key found in agent. Trying again."
+            
+          eval "$(ssh-agent -s)"
+            ssh-add - <<< "${{ secrets.FACSIMILAB_BOT_SSHKEY }}"
+
+          if ! ssh-add -l | grep -q "ED25519"; then
+            echo "No SSH key found in agent. Disabling commit signing."
+            git config --global commit.gpgsign false
+          else
+            echo "SSH key found in agent. Enabling commit signing."
+            git config --global user.signingkey "ssh-ed25519 ${{ secrets.AUTOMATED_PRANAVMISHRA90_SSH_PUBKEY }}  Automated_Signature-Pranav_Mishra"
+            git config --global gpg.format ssh
+            git config --global commit.gpgsign true
+            git config --global tag.gpgSign true
+          fi
 
       - name: Modify script URLs and fix permissions
         shell: bash
