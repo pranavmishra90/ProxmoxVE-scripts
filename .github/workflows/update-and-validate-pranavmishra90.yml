@@ -106,10 +106,6 @@ jobs:
           echo "DRY_RUN=${{ github.event.inputs.dry_run }}" >> $GITHUB_ENV
           echo "Dry run mode is set to: ${{ github.event.inputs.dry_run }}"
 
-      - name: Log Dry-Run Status
-        run: |
-          echo "Dry run mode is set to: $DRY_RUN"
-
       - name: Unset git configuration
         if: env.DRY_RUN == 'true'
         run: |
@@ -124,7 +120,19 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          gh pr create --base main \
-          --head $(git branch --show-current) \
-          --title "Updated scripts from upstream [${{ env.timestamp }}]" \
-          --body "This PR updates the scripts from the upstream repository.\n\n  - URLs have been modified to this fork. \n  - Permissions have been fixed."
+          git checkout --no-track -B ci/automated-update ${{ env.BRANCH_NAME }}
+
+
+          if gh pr list --base main --head $(git branch --show-current) --json number --jq '. | length > 0'; then
+            echo "Pull request already exists between main and $(git branch --show-current)."
+            git push -u -v origin ci/automated-update
+            echo "Updated the existing pull request with the latest changes."
+          else
+            echo "No pull request exists. Proceeding to create a new pull request.";
+            
+
+            gh pr create --base main \
+            --head $(git branch --show-current) \
+            --title "Updated scripts from upstream [${{ env.timestamp }}]" \
+            --body "This PR updates the scripts from the upstream repository.\n\n  - URLs have been modified to this fork. \n  - Permissions have been fixed."
+          fi
