@@ -78,13 +78,14 @@ jobs:
         run: |
           echo "Dry run mode is set to: $DRY_RUN"
 
-      - name: Disable Commit Signing
+      - name: Unset git configuration
         if: env.DRY_RUN == 'true'
         run: |
           echo "Disabling commit signing for dry run mode."
-          git config --global commit.gpgsign false
-          git config --global tag.gpgSign false
-
+          git config --global --unset user.signingkey
+          git config --global --unset gpg.format
+          git config --global --unset commit.gpgsign 
+          git config --global --unset tag.gpgSign
       - name: Create Pull Request
         id: create_pr
         if: env.DRY_RUN != 'true'
