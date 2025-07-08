@@ -68,6 +68,31 @@ jobs:
           echo "timestamp=$DATESTAMP" >> $GITHUB_ENV
           echo "Generated timestamp: $DATESTAMP"
 
+
+
+  create-pr:
+    name: Create Pull Request
+    needs: update-and-validate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup | Checkout Repository at workflow sha
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+
+      - name: Setup | Force correct release branch on workflow SHA
+        run: |
+          git checkout -B ${{ github.ref_name }}
+
+      - name: Add a date stamp
+        id: date_stamp
+        run: |
+          DATESTAMP=$(date +%Y-%m-%d)
+          echo "timestamp=$DATESTAMP" >> $GITHUB_ENV
+          echo "Generated timestamp: $DATESTAMP"
+
       - name: Dry Run Check
         id: dry_run_check
         run: |
