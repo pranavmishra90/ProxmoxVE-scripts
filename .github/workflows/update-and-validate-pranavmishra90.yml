@@ -86,7 +86,9 @@ jobs:
           DATE=$(date +%Y-%m-%d)
           BRANCH_NAME="feat/update-$DATE"
           echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
-          git checkout -B $BRANCH_NAME
+          git checkout -B ${BRANCH_NAME} origin/${BRANCH_NAME}
+          echo "Checked out branch: ${BRANCH_NAME}"
+          git push -v -u origin ${BRANCH_NAME}
 
       - name: Add a date stamp
         id: date_stamp
