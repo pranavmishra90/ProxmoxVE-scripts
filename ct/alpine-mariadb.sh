@@ -11,7 +11,7 @@ var_cpu="${var_cpu:-1}"
 var_ram="${var_ram:-256}"
 var_disk="${var_disk:-1}"
 var_os="${var_os:-alpine}"
-var_version="${var_version:-3.21}"
+var_version="${var_version:-3.22}"
 var_unprivileged="${var_unprivileged:-1}"
 
 header_info "$APP"
@@ -20,20 +20,19 @@ color
 catch_errors
 
 function update_script() {
-    msg_info "Updating Alpine Packages"
-    $STD apk update
-    $STD apk upgrade
-    msg_ok "Updated Alpine Packages"
+  msg_info "Updating Alpine Packages"
+  $STD apk -U upgrade
+  msg_ok "Updated Alpine Packages"
 
-    msg_info "Updating MariaDB"
-    $STD apk upgrade mariadb mariadb-client
-    msg_ok "Updated MariaDB"
+  msg_info "Updating MariaDB"
+  $STD apk upgrade mariadb mariadb-client
+  msg_ok "Updated MariaDB"
 
-    msg_info "Restarting MariaDB"
-    $STD rc-service mariadb restart
-    msg_ok "Restarted MariaDB"
+  msg_info "Restarting MariaDB"
+  $STD rc-service mariadb restart
+  msg_ok "Restarted MariaDB"
 
-    exit 0
+  exit 0
 }
 
 start

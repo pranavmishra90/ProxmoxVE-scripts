@@ -37,11 +37,10 @@ $STD apt-get install -y \
   docker-compose-plugin
 msg_ok "Installed Docker"
 
-echo "Choose the database for Komodo installation:"
-echo "1) MongoDB (recommended)"
-echo "2) SQLite"
-echo "3) PostgreSQL"
-read -rp "Enter your choice (default: 1): " DB_CHOICE
+echo "${TAB3}Choose the database for Komodo installation:"
+echo "${TAB3}1) MongoDB (recommended)"
+echo "${TAB3}2) FerretDB"
+read -rp "${TAB3}Enter your choice (default: 1): " DB_CHOICE
 DB_CHOICE=${DB_CHOICE:-1}
 
 case $DB_CHOICE in
@@ -49,10 +48,7 @@ case $DB_CHOICE in
   DB_COMPOSE_FILE="mongo.compose.yaml"
   ;;
 2)
-  DB_COMPOSE_FILE="sqlite.compose.yaml"
-  ;;
-3)
-  DB_COMPOSE_FILE="postgres.compose.yaml"
+  DB_COMPOSE_FILE="ferretdb.compose.yaml"
   ;;
 *)
   echo "Invalid choice. Defaulting to MongoDB."
@@ -61,7 +57,7 @@ case $DB_CHOICE in
 esac
 mkdir -p /opt/komodo
 cd /opt/komodo
-curl -fsSL "https://raw.githubusercontent.com/moghtech/komodo/main/compose/$DB_COMPOSE_FILE" -o $(basename "https://raw.githubusercontent.com/moghtech/komodo/main/compose/$DB_COMPOSE_FILE")
+curl -fsSL "https://raw.githubusercontent.com/moghtech/komodo/main/compose/$DB_COMPOSE_FILE" -o "/opt/komodo/$DB_COMPOSE_FILE"
 
 msg_info "Setup Komodo Environment"
 curl -fsSL "https://raw.githubusercontent.com/moghtech/komodo/main/compose/compose.env" -o "/opt/komodo/compose.env"

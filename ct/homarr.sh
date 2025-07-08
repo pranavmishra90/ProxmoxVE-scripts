@@ -6,10 +6,10 @@ source <(curl -s https://raw.githubusercontent.com/pranavmishra90/ProxmoxVE/main
 # License: MIT
 # https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
 
-APP="Homarr"
+APP="homarr"
 var_tags="${var_tags:-arr;dashboard}"
-var_cpu="${var_cpu:-2}"
-var_ram="${var_ram:-4096}"
+var_cpu="${var_cpu:-3}"
+var_ram="${var_ram:-6144}"
 var_disk="${var_disk:-8}"
 var_os="${var_os:-debian}"
 var_version="${var_version:-12}"
@@ -49,6 +49,7 @@ source /opt/homarr/.env
 set +a
 export DB_DIALECT='sqlite'
 export AUTH_SECRET=$(openssl rand -base64 32)
+export CRON_JOB_API_KEY=$(openssl rand -base64 32)
 node /opt/homarr_db/migrations/$DB_DIALECT/migrate.cjs /opt/homarr_db/migrations/$DB_DIALECT
 for dir in $(find /opt/homarr_db/migrations/migrations -mindepth 1 -maxdepth 1 -type d); do
   dirname=$(basename "$dir")
@@ -82,7 +83,7 @@ EOF
     systemctl daemon-reload
   fi
   RELEASE=$(curl -fsSL https://api.github.com/repos/homarr-labs/homarr/releases/latest | grep "tag_name" | awk '{print substr($2, 3, length($2)-4) }')
-  if [[ ! -f /opt/${APP}_version.txt ]] || [[ "${RELEASE}" != "$(cat /opt/${APP}_version.txt)" ]]; then
+  if [[ "${RELEASE}" != "$(cat ~/.${APP} 2>/dev/null || cat /opt/${APP}_version.txt 2>/dev/null)" ]]; then
 
     msg_info "Stopping Services (Patience)"
     systemctl stop homarr
@@ -93,6 +94,19 @@ EOF
     cp /opt/homarr/.env /opt/homarr-data-backup/.env
     msg_ok "Backup Data"
 
+    msg_info "Updating Nodejs"
+    $STD apt update
+    $STD apt upgrade nodejs -y
+    msg_ok "Updated Nodejs"
+
+    $STD command -v jq || $STD apt-get update && $STD apt-get install -y jq
+    NODE_VERSION=$(curl -s https://raw.githubusercontent.com/homarr-labs/homarr/dev/package.json | jq -r '.engines.node | split(">=")[1] | split(".")[0]')
+    NODE_MODULE="pnpm@$(curl -s https://raw.githubusercontent.com/homarr-labs/homarr/dev/package.json | jq -r '.packageManager | split("@")[1]')"
+    setup_nodejs
+
+    rm -rf /opt/homarr
+    fetch_and_deploy_gh_release "homarr" "homarr-labs/homarr"
+
     msg_info "Updating and rebuilding ${APP} to v${RELEASE} (Patience)"
     rm /opt/run_homarr.sh
     cat <<'EOF' >/opt/run_homarr.sh
@@ -102,6 +116,7 @@ source /opt/homarr/.env
 set +a
 export DB_DIALECT='sqlite'
 export AUTH_SECRET=$(openssl rand -base64 32)
+export CRON_JOB_API_KEY=$(openssl rand -base64 32)
 node /opt/homarr_db/migrations/$DB_DIALECT/migrate.cjs /opt/homarr_db/migrations/$DB_DIALECT
 for dir in $(find /opt/homarr_db/migrations/migrations -mindepth 1 -maxdepth 1 -type d); do
   dirname=$(basename "$dir")
@@ -118,14 +133,9 @@ node apps/nextjs/server.js & PID=$!
 wait $PID
 EOF
     chmod +x /opt/run_homarr.sh
-curl -fsSL "https://github.com/homarr-labs/homarr/archive/refs/tags/v${RELEASE}.zip" -o $(basename "https://github.com/homarr-labs/homarr/archive/refs/tags/v${RELEASE}.zip")
-    unzip -q v${RELEASE}.zip
-    rm -rf v${RELEASE}.zip
-    rm -rf /opt/homarr
-    mv homarr-${RELEASE} /opt/homarr
     mv /opt/homarr-data-backup/.env /opt/homarr/.env
     cd /opt/homarr
-    $STD pnpm install
+    $STD pnpm install --recursive --frozen-lockfile --shamefully-hoist
     $STD pnpm build
     cp /opt/homarr/apps/nextjs/next.config.ts .
     cp /opt/homarr/apps/nextjs/package.json .
@@ -151,7 +161,7 @@ curl -fsSL "https://github.com/homarr-labs/homarr/archive/refs/tags/v${RELEASE}.
     systemctl start homarr
     msg_ok "Started Services"
     msg_ok "Updated Successfully"
-    read -p "It's recommended to reboot the LXC after an update, would you like to reboot the LXC now ? (y/n): " choice
+    read -p "${TAB3}It's recommended to reboot the LXC after an update, would you like to reboot the LXC now ? (y/n): " choice
     if [[ "$choice" =~ ^[Yy]$ ]]; then
       reboot
     fi

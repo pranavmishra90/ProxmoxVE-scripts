@@ -11,7 +11,7 @@ var_cpu="${var_cpu:-1}"
 var_ram="${var_ram:-256}"
 var_disk="${var_disk:-1}"
 var_os="${var_os:-alpine}"
-var_version="${var_version:-3.21}"
+var_version="${var_version:-3.22}"
 var_unprivileged="${var_unprivileged:-1}"
 
 header_info "$APP"
@@ -20,19 +20,18 @@ color
 catch_errors
 
 function update_script() {
-    header_info
-    msg_info "Updating Alpine Packages"
-    apk update
-    apk upgrade
-    msg_ok "Updated Alpine Packages"
+  header_info
+  msg_info "Updating Alpine Packages"
+  $STD apk -U upgrade
+  msg_ok "Updated Alpine Packages"
 
-    msg_info "Updating Gitea"
-    apk upgrade gitea
-    msg_ok "Updated Gitea"
+  msg_info "Updating Gitea"
+  apk upgrade gitea
+  msg_ok "Updated Gitea"
 
-    msg_info "Restarting Gitea"
-    rc-service gitea restart
-    msg_ok "Restarted Gitea"
+  msg_info "Restarting Gitea"
+  rc-service gitea restart
+  msg_ok "Restarted Gitea"
 }
 
 start

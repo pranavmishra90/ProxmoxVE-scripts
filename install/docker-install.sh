@@ -14,7 +14,7 @@ network_check
 update_os
 
 get_latest_release() {
-  curl -fsSL https://api.github.com/repos/$1/releases/latest | grep '"tag_name":' | cut -d'"' -f4
+  curl -fsSL https://api.github.com/repos/"$1"/releases/latest | grep '"tag_name":' | cut -d'"' -f4
 }
 
 DOCKER_LATEST_VERSION=$(get_latest_release "moby/moby")
@@ -29,7 +29,7 @@ echo -e '{\n  "log-driver": "journald"\n}' >/etc/docker/daemon.json
 $STD sh <(curl -fsSL https://get.docker.com)
 msg_ok "Installed Docker $DOCKER_LATEST_VERSION"
 
-read -r -p "Would you like to add Portainer? <y/N> " prompt
+read -r -p "${TAB3}Would you like to add Portainer? <y/N> " prompt
 if [[ ${prompt,,} =~ ^(y|yes)$ ]]; then
   msg_info "Installing Portainer $PORTAINER_LATEST_VERSION"
   docker volume create portainer_data >/dev/null
@@ -43,7 +43,7 @@ if [[ ${prompt,,} =~ ^(y|yes)$ ]]; then
     portainer/portainer-ce:latest
   msg_ok "Installed Portainer $PORTAINER_LATEST_VERSION"
 else
-  read -r -p "Would you like to add the Portainer Agent? <y/N> " prompt
+  read -r -p "${TAB3}Would you like to add the Portainer Agent? <y/N> " prompt
   if [[ ${prompt,,} =~ ^(y|yes)$ ]]; then
     msg_info "Installing Portainer agent $PORTAINER_AGENT_LATEST_VERSION"
     $STD docker run -d \
@@ -55,6 +55,15 @@ else
       portainer/agent
     msg_ok "Installed Portainer Agent $PORTAINER_AGENT_LATEST_VERSION"
   fi
+fi
+
+read -r -p "${TAB3}Would you like to expose the Docker TCP socket? <y/N> " prompt
+if [[ "${prompt,,}" =~ ^(y|yes)$ ]]; then
+  msg_info "Exposing Docker TCP socket"
+  $STD mkdir -p /etc/docker
+  $STD echo '{ "hosts": ["unix:///var/run/docker.sock", "tcp://0.0.0.0:2375"] }' > /etc/docker/daemon.json
+  $STD rc-service docker restart
+  msg_ok "Exposed Docker TCP socket at tcp://+:2375"
 fi
 
 motd_ssh

@@ -3,7 +3,7 @@ source <(curl -s https://raw.githubusercontent.com/pranavmishra90/ProxmoxVE/main
 # Copyright (c) 2021-2024 tteck
 # Author: tteck (tteckster)
 # License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
-# Source: https://triliumnext.github.io/Docs/
+# Source: https://github.com/TriliumNext/Trilium
 
 APP="Trilium"
 var_tags="${var_tags:-notes}"
@@ -27,28 +27,39 @@ function update_script() {
     msg_error "No ${APP} Installation Found!"
     exit
   fi
-  if [[ ! -f /opt/${APP}_version.txt ]]; then touch /opt/${APP}_version.txt; fi
-  RELEASE=$(curl -fsSL https://api.github.com/repos/TriliumNext/Notes/releases/latest | grep "tag_name" | awk '{print substr($2, 3, length($2)-4) }')
-  if [[ "v${RELEASE}" != "$(cat /opt/${APP}_version.txt)" ]] || [[ ! -f /opt/${APP}_version.txt ]]; then
+  RELEASE=$(curl -fsSL https://api.github.com/repos/TriliumNext/Trilium/releases/latest | grep "tag_name" | awk '{print substr($2, 3, length($2)-4) }')
+  if [[ "${RELEASE}" != "$(cat ~/.Trilium 2>/dev/null)" ]] || [[ ! -f ~/.Trilium ]]; then
+
+    if [[ -d /opt/trilium/db ]]; then
+      DB_PATH="/opt/trilium/db"
+      DB_RESTORE_PATH="/opt/trilium/db"
+    elif [[ -d /opt/trilium/assets/db ]]; then
+      DB_PATH="/opt/trilium/assets/db"
+      DB_RESTORE_PATH="/opt/trilium/assets/db"
+    else
+      msg_error "Database not found in either /opt/trilium/db or /opt/trilium/assets/db"
+      exit 1
+    fi
+
     msg_info "Stopping ${APP}"
     systemctl stop trilium
     sleep 1
     msg_ok "Stopped ${APP}"
 
-    msg_info "Updating to ${RELEASE}"
+    msg_info "Backing up Database"
     mkdir -p /opt/trilium_backup
-    mv /opt/trilium/db /opt/trilium_backup/
+    cp -r "${DB_PATH}" /opt/trilium_backup/
     rm -rf /opt/trilium
-    cd /tmp
-    curl -fsSL "https://github.com/TriliumNext/Notes/releases/download/v${RELEASE}/TriliumNextNotes-Server-v${RELEASE}-linux-x64.tar.xz" -o $(basename "https://github.com/TriliumNext/Notes/releases/download/v${RELEASE}/TriliumNextNotes-Server-v${RELEASE}-linux-x64.tar.xz")
-    tar -xf TriliumNextNotes-Server-v${RELEASE}-linux-x64.tar.xz
-    mv TriliumNextNotes-Server-$RELEASE-linux-x64 /opt/trilium
-    cp -r /opt/trilium_backup/db /opt/trilium/
-    echo "v${RELEASE}" >/opt/${APP}_version.txt
-    msg_ok "Updated to ${RELEASE}"
+    msg_ok "Backed up Database"
+
+    fetch_and_deploy_gh_release "Trilium" "TriliumNext/Trilium" "prebuild" "latest" "/opt/trilium" "TriliumNotes-Server-*linux-x64.tar.xz"
+
+    msg_info "Restoring Database"
+    mkdir -p "$(dirname "${DB_RESTORE_PATH}")"
+    cp -r /opt/trilium_backup/$(basename "${DB_PATH}") "${DB_RESTORE_PATH}"
+    msg_ok "Restored Database"
 
     msg_info "Cleaning up"
-    rm -rf /tmp/TriliumNextNotes-Server-${RELEASE}-linux-x64.tar.xz
     rm -rf /opt/trilium_backup
     msg_ok "Cleaned"
 
@@ -60,6 +71,7 @@ function update_script() {
   else
     msg_ok "No update required. ${APP} is already at ${RELEASE}"
   fi
+
   exit
 }
 

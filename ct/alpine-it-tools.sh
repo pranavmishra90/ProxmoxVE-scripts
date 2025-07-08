@@ -9,9 +9,9 @@ APP="Alpine-IT-Tools"
 var_tags="${var_tags:-alpine;development}"
 var_cpu="${var_cpu:-1}"
 var_ram="${var_ram:-256}"
-var_disk="${var_disk:-0.5}"
+var_disk="${var_disk:-1}"
 var_os="${var_os:-alpine}"
-var_version="${var_version:-3.21}"
+var_version="${var_version:-3.22}"
 var_unprivileged="${var_unprivileged:-1}"
 
 header_info "$APP"
@@ -21,8 +21,6 @@ catch_errors
 
 function update_script() {
   header_info
-  check_container_storage
-  check_container_resources
 
   if [ ! -d /usr/share/nginx/html ]; then
     msg_error "No ${APP} Installation Found!"
@@ -36,7 +34,7 @@ function update_script() {
     curl -fsSL -o it-tools.zip "$DOWNLOAD_URL"
     mkdir -p /usr/share/nginx/html
     rm -rf /usr/share/nginx/html/*
-    unzip -q it-tools.zip -d /tmp/it-tools
+    $STD unzip it-tools.zip -d /tmp/it-tools
     cp -r /tmp/it-tools/dist/* /usr/share/nginx/html
     rm -rf /tmp/it-tools
     rm -f it-tools.zip
