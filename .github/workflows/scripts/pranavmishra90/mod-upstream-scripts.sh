@@ -43,14 +43,14 @@ git checkout --no-track -B ${BRANCH_NAME} main
 
 # Fetch the latest changes from the upstream repository into the upstream branch
 git checkout upstream
-git merge upstream/main -X ours
+git merge --quiet upstream/main -X ours
 
 # Merge the upstream branch into the intermediate branch
 git checkout ${BRANCH_NAME}
-git merge upstream -X ours
+git merge --quiet upstream -X ours
 
 # Delete the remote branch if it exists
-git push origin --delete ${BRANCH_NAME} || echo "Remote branch ${BRANCH_NAME} does not exist."
+git push origin -v --delete ${BRANCH_NAME} || echo "Remote branch ${BRANCH_NAME} does not exist."
 
 
 # We expect to find merge conflicts here
