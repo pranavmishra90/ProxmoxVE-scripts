@@ -2,8 +2,6 @@ name: Update and Validate Upstream Scripts
 
 on:
   push:
-    branches:
-      - upstream
   workflow_dispatch:
     inputs:
       dry_run:
@@ -121,6 +119,8 @@ jobs:
       - name: Create Pull Request
         id: create_pr
         if: env.DRY_RUN != 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           gh pr create --base main \
           --head $(git branch --show-current) \
