@@ -33,6 +33,7 @@ jobs:
           git checkout -B ${{ github.ref_name }}
 
       - name: Setup | Configure Git
+        run: |
           git config --global user.email "62562712+pranavmishra90@users.noreply.github.com"
           git config --global user.name "Pranav Kumar Mishra"
 
