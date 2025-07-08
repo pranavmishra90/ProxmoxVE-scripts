@@ -121,7 +121,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           git checkout --no-track -B ci/automated-update ${{ env.BRANCH_NAME }}
-
+          git push -u -v origin ci/automated-update
 
           if gh pr list --base main --head $(git branch --show-current) --json number --jq '. | length > 0'; then
             echo "Pull request already exists between main and $(git branch --show-current)."
@@ -129,10 +129,10 @@ jobs:
             echo "Updated the existing pull request with the latest changes."
           else
             echo "No pull request exists. Proceeding to create a new pull request.";
-            
+            git push -u -v origin ci/automated-update
 
             gh pr create --base main \
             --head $(git branch --show-current) \
             --title "Updated scripts from upstream [${{ env.timestamp }}]" \
-            --body "This PR updates the scripts from the upstream repository.\n\n  - URLs have been modified to this fork. \n  - Permissions have been fixed."
+            --body "This PR updates the scripts from the upstream repository.<br><br>  - URLs have been modified to this fork. <br>  - Permissions have been fixed."
           fi

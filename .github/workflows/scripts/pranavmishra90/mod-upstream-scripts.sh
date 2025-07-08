@@ -49,6 +49,10 @@ git merge upstream/main -X ours
 git checkout ${BRANCH_NAME}
 git merge upstream -X ours
 
+# Delete the remote branch if it exists
+git push origin --delete ${BRANCH_NAME} || echo "Remote branch ${BRANCH_NAME} does not exist."
+
+
 # We expect to find merge conflicts here
 # Resolve merge conflicts (if any) by keeping my fork's changes
 if [ $? -ne 0 ]; then
