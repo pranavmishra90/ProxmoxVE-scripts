@@ -120,6 +120,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
+          git config --global user.email "62562712+pranavmishra90@users.noreply.github.com"
+          git config --global user.name "Pranav Kumar Mishra"
+
           git checkout --no-track -B ci/automated-update ${{ env.BRANCH_NAME }}
           git branch --set-upstream-to=origin/ci/automated-update ci/automated-update
 
@@ -143,5 +146,5 @@ jobs:
             --head ci/automated-update \
             --title "Updated scripts from upstream [${{ env.timestamp }}]" \
             --body "This PR updates the scripts from the upstream repository.<br><br>  - URLs have been modified to this fork. <br>  - Permissions have been fixed."
-            
+
           fi
