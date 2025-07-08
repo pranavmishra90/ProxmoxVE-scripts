@@ -40,6 +40,10 @@ git remote set-url --push upstream no_push
 git checkout main
 git checkout --no-track -B ${BRANCH_NAME} main
 
+# Delete the remote branch if it exists
+echo "[INFO] Deleting remote branch if it exists: ${BRANCH_NAME}"
+git push origin -v --delete ${BRANCH_NAME} || echo "Remote branch ${BRANCH_NAME} does not exist."
+
 
 # Fetch the latest changes from the upstream repository into the upstream branch
 git checkout upstream
@@ -48,9 +52,6 @@ git merge --quiet upstream/main -X ours
 # Merge the upstream branch into the intermediate branch
 git checkout ${BRANCH_NAME}
 git merge --quiet upstream -X ours
-
-# Delete the remote branch if it exists
-git push origin -v --delete ${BRANCH_NAME} || echo "Remote branch ${BRANCH_NAME} does not exist."
 
 
 # We expect to find merge conflicts here
