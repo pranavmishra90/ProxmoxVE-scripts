@@ -18,10 +18,10 @@ variables() {
 source <(curl -fsSL https://raw.githubusercontent.com/pranavmishra90/ProxmoxVE/main/misc/api.func)
 
 if command -v curl >/dev/null 2>&1; then
-  source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/core.func)
+  source <(curl -fsSL https://raw.githubusercontent.com/pranavmishra90/ProxmoxVE/main/misc/core.func)
   load_functions
 elif command -v wget >/dev/null 2>&1; then
-  source <(wget -qO- https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/core.func)
+  source <(wget -qO- https://raw.githubusercontent.com/pranavmishra90/ProxmoxVE/main/misc/core.func)
   load_functions
 fi
 # This function enables error handling in the script by setting options and defining a trap for the ERR signal.
@@ -957,7 +957,7 @@ install_script() {
       header_info
       echo -e "${INFO}${HOLD} ${GN}Using Config File on node $PVEHOST_NAME${CL}"
       METHOD="config_file"
-      source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/config-file.func)
+      source <(curl -fsSL https://raw.githubusercontent.com/pranavmishra90/ProxmoxVE/main/misc/config-file.func)
       config_file
       break
       ;;
@@ -1278,7 +1278,7 @@ EOF'
   fi
   msg_ok "Customized LXC Container"
 
-  lxc-attach -n "$CTID" -- bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/install/"$var_install".sh)" $?
+  lxc-attach -n "$CTID" -- bash -c "$(curl -fsSL https://raw.githubusercontent.com/pranavmishra90/ProxmoxVE/main/install/"$var_install".sh)" $?
 }
 
 # This function sets the description of the container.
