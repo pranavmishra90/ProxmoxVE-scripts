@@ -38,7 +38,8 @@ jobs:
             echo "No SSH key found in agent. Trying to restart the ssh-agent."
             eval "$(ssh-agent -s)"
             ssh-add - <<< "${{ secrets.FACSIMILAB_BOT_SSHKEY }}"
-
+          fi
+          
           if ! ssh-add -l | grep -q "ED25519"; then
             echo "No SSH key found in agent. Disabling commit signing."
             git config --global commit.gpgsign false
