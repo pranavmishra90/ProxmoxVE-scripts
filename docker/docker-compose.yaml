@@ -1,0 +1,9 @@
+services:
+  app:
+    image: pranavmishra90/pve-scripts:latest
+    container_name: pve-scripts
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile
+    ports:
+      - 3030:3000
