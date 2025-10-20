@@ -6,7 +6,7 @@ source <(curl -fsSL https://raw.githubusercontent.com/pranavmishra90/ProxmoxVE/m
 # Source: https://www.authelia.com/
 
 APP="Authelia"
-TAGS=""
+var_tags="${var_tags:-authenticator}"
 var_cpu="${var_cpu:-1}"
 var_ram="${var_ram:-512}"
 var_disk="${var_disk:-2}"
@@ -25,12 +25,12 @@ function update_script() {
   header_info
   check_container_storage
   check_container_resources
-  if [[ ! -d "/etc/authelia/" ]]; then
+  if [[ ! -d /etc/authelia/ ]]; then
     msg_error "No ${APP} Installation Found!"
     exit
   fi
-  RELEASE=$(curl -fsSL https://api.github.com/repos/authelia/authelia/releases/latest | grep "tag_name" | awk '{print substr($2, 2, length($2)-3) }')
-  if [[ "${RELEASE}" != "$(/usr/bin/authelia -v | awk '{print substr($3, 2, length($2)) }')" ]]; then
+
+  if check_for_gh_release "authelia" "authelia/authelia"; then
     $STD apt-get update
     $STD apt-get -y upgrade
 
@@ -40,14 +40,10 @@ function update_script() {
     $STD apt-get -y autoremove
     $STD apt-get -y autoclean
     msg_ok "Cleanup Completed"
-
-    msg_ok "Updated $APP to ${RELEASE}"
-  else
-    msg_ok "No update required. ${APP} is already at ${RELEASE}"
+    msg_ok "Updated Successfully"
   fi
   exit
 }
-
 start
 build_container
 description

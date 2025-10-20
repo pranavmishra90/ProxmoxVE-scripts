@@ -13,12 +13,9 @@ setting_up_container
 network_check
 update_os
 
-msg_info "Installing Dependencies"
-$STD apt-get install -y apache2
-msg_ok "Installed Dependencies"
-
 PG_VERSION="16" setup_postgresql
-PHP_APACHE="YES" PHP_MODULE="pgsql, dom" PHP_VERSION="8.2" setup_php
+PHP_APACHE="YES" PHP_MODULE="pgsql" PHP_VERSION="8.2" setup_php
+setup_composer
 fetch_and_deploy_gh_release "baikal" "sabre-io/Baikal"
 
 msg_info "Setting up PostgreSQL Database"
@@ -36,6 +33,8 @@ $STD sudo -u postgres psql -c "CREATE DATABASE $DB_NAME WITH OWNER $DB_USER TEMP
 msg_ok "Set up PostgreSQL Database"
 
 msg_info "Configuring Baikal"
+cd /opt/baikal
+$STD composer install
 cat <<EOF >/opt/baikal/config/baikal.yaml
 database:
     backend: pgsql

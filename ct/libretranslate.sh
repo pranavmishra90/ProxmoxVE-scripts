@@ -11,7 +11,7 @@ var_cpu="${var_cpu:-2}"
 var_ram="${var_ram:-2048}"
 var_disk="${var_disk:-20}"
 var_os="${var_os:-debian}"
-var_version="${var_version:-12}"
+var_version="${var_version:-13}"
 var_unprivileged="${var_unprivileged:-1}"
 
 header_info "$APP"
@@ -28,25 +28,21 @@ function update_script() {
     msg_error "No ${APP} Installation Found!"
     exit
   fi
-  RELEASE=$(curl -s https://api.github.com/repos/LibreTranslate/LibreTranslate/releases/latest | grep "tag_name" | awk '{print substr($2, 3, length($2)-4) }')
-  if [[ "${RELEASE}" != "$(cat $HOME/.libretranslate)" ]] || [[ ! -f $HOME/.libretranslate ]]; then
+  if check_for_gh_release "libretranslate" "LibreTranslate/LibreTranslate"; then
     msg_info "Stopping $APP"
     systemctl stop libretranslate
     msg_ok "Stopped $APP"
 
-    msg_info "Updating $APP to ${RELEASE}"
+    msg_info "Updating $APP"
     cd /opt/libretranslate
     source .venv/bin/activate
     $STD pip install -U libretranslate
-    msg_ok "Updated $APP to ${RELEASE}"
+    msg_ok "Updated $APP"
 
     msg_info "Starting $APP"
     systemctl start libretranslate
     msg_ok "Started $APP"
-
     msg_ok "Update Successful"
-  else
-    msg_ok "No update required. ${APP} is already at ${RELEASE}"
   fi
   exit
 }

@@ -16,13 +16,14 @@ update_os
 fetch_and_deploy_gh_release "librespeed-rust" "librespeed/speedtest-rust" "binary" "latest" "/opt/librespeed-rust" "librespeed-rs-x86_64-unknown-linux-gnu.deb"
 
 msg_info "Enabling Service"
-systemctl enable -q --now speedtest_rs.service
+systemctl enable -q --now speedtest_rs
 msg_ok "Enabled Service"
 
 motd_ssh
 customize
 
 msg_info "Cleaning up"
-$STD apt-get -y autoremove
-$STD apt-get -y autoclean
+$STD apt -y autoremove
+$STD apt -y autoclean
+$STD apt -y clean
 msg_ok "Cleaned"

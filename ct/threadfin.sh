@@ -11,7 +11,7 @@ var_cpu="${var_cpu:-1}"
 var_ram="${var_ram:-1024}"
 var_disk="${var_disk:-4}"
 var_os="${var_os:-debian}"
-var_version="${var_version:-12}"
+var_version="${var_version:-13}"
 var_unprivileged="${var_unprivileged:-1}"
 
 header_info "$APP"
@@ -28,22 +28,17 @@ function update_script() {
     exit
   fi
 
-  RELEASE=$(curl -fsSL https://api.github.com/repos/threadfin/threadfin/releases/latest | grep "tag_name" | awk '{print substr($2, 2, length($2)-3) }')
-  if [[ "${RELEASE}" != "$(cat ~/.threadfin 2>/dev/null)" ]] || [[ ! -f ~/.threadfin ]]; then
-
-    msg_info "Stopping $APP"
+  if check_for_gh_release "threadfin" "threadfin/threadfin"; then
+    msg_info "Stopping Service"
     systemctl stop threadfin
-    msg_ok "Stopped $APP"
+    msg_ok "Stopped Service"
 
     fetch_and_deploy_gh_release "threadfin" "threadfin/threadfin" "singlefile" "latest" "/opt/threadfin" "Threadfin_linux_amd64"
 
-    msg_info "Starting $APP"
+    msg_info "Starting Service"
     systemctl start threadfin
-    msg_ok "Started $APP"
-
-    msg_ok "Updated Successfully"
-  else
-    msg_ok "No update required. ${APP} is already at v${RELEASE}"
+    msg_ok "Started Service"
+    msg_ok "Updated Successfully!"
   fi
   exit
 }

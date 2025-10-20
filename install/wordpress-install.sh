@@ -13,13 +13,7 @@ setting_up_container
 network_check
 update_os
 
-msg_info "Installing Dependencies (Patience)"
-$STD apt-get install -y \
-  apache2 \
-  php8.2-{bcmath,common,cli,curl,fpm,gd,snmp,imap,mbstring,mysql,xml,zip} \
-  libapache2-mod-php
-msg_ok "Installed Dependencies"
-
+PHP_VERSION="8.4" PHP_FPM="YES" PHP_MODULE="common,snmp,imap,mysql" PHP_APACHE="YES" setup_php
 setup_mariadb
 
 msg_info "Setting up Database"
@@ -38,11 +32,11 @@ $STD mariadb -u root -e "GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'local
 msg_ok "Set up Database"
 
 msg_info "Installing Wordpress (Patience)"
-cd /var/www/html
+cd /var/www/html || exit
 curl -fsSL "https://wordpress.org/latest.zip" -o "latest.zip"
 $STD unzip latest.zip
 chown -R www-data:www-data wordpress/
-cd /var/www/html/wordpress
+cd /var/www/html/wordpress || exit
 find . -type d -exec chmod 755 {} \;
 find . -type f -exec chmod 644 {} \;
 mv wp-config-sample.php wp-config.php
@@ -77,6 +71,7 @@ customize
 
 msg_info "Cleaning up"
 rm -rf /var/www/html/latest.zip
-$STD apt-get autoremove
-$STD apt-get autoclean
+$STD apt -y autoremove
+$STD apt -y autoclean
+$STD apt -y clean
 msg_ok "Cleaned"

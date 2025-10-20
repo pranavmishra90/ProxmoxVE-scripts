@@ -3,12 +3,12 @@ source <(curl -fsSL https://raw.githubusercontent.com/pranavmishra90/ProxmoxVE/m
 # Copyright (c) 2021-2025 community-scripts ORG
 # Author: MickLesk (CanbiZ)
 # License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
-# Source: https://github.com/adityachandelgit/BookLore
+# Source: https://github.com/booklore-app/BookLore
 
 APP="BookLore"
 var_tags="${var_tags:-books;library}"
 var_cpu="${var_cpu:-3}"
-var_ram="${var_ram:-2048}"
+var_ram="${var_ram:-3072}"
 var_disk="${var_disk:-7}"
 var_os="${var_os:-debian}"
 var_version="${var_version:-12}"
@@ -28,14 +28,16 @@ function update_script() {
     msg_error "No ${APP} Installation Found!"
     exit
   fi
-
-  RELEASE=$(curl -fsSL https://api.github.com/repos/adityachandelgit/BookLore/releases/latest | yq '.tag_name' | sed 's/^v//')
-  if [[ "${RELEASE}" != "$(cat ~/.booklore 2>/dev/null)" ]] || [[ ! -f ~/.booklore ]]; then
+  if check_for_gh_release "booklore" "booklore-app/BookLore"; then
     msg_info "Stopping $APP"
     systemctl stop booklore
     msg_ok "Stopped $APP"
 
-    fetch_and_deploy_gh_release "booklore" "adityachandelgit/BookLore"
+    msg_info "backup old install"
+    mv /opt/booklore /opt/booklore_bak
+    msg_ok "backup done"
+
+    fetch_and_deploy_gh_release "booklore" "booklore-app/BookLore"
 
     msg_info "Building Frontend"
     cd /opt/booklore/booklore-ui
@@ -43,9 +45,11 @@ function update_script() {
     $STD npm run build --configuration=production
     msg_ok "Built Frontend"
 
+    JAVA_VERSION="25" setup_java
+
     msg_info "Building Backend"
     cd /opt/booklore/booklore-api
-    APP_VERSION=$(curl -fsSL https://api.github.com/repos/adityachandelgit/BookLore/releases/latest | yq '.tag_name' | sed 's/^v//')
+    APP_VERSION=$(curl -fsSL https://api.github.com/repos/booklore-app/BookLore/releases/latest | yq '.tag_name' | sed 's/^v//')
     yq eval ".app.version = \"${APP_VERSION}\"" -i src/main/resources/application.yaml
     $STD ./gradlew clean build --no-daemon
     mkdir -p /opt/booklore/dist
@@ -60,11 +64,9 @@ function update_script() {
     msg_info "Starting $APP"
     systemctl start booklore
     systemctl reload nginx
+    rm -rf /opt/booklore_bak
     msg_ok "Started $APP"
-
-    msg_ok "Update Successful"
-  else
-    msg_ok "No update required. ${APP} is already at v${RELEASE}"
+    msg_ok "Updated Successfully"
   fi
   exit
 }

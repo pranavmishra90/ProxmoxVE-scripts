@@ -23,7 +23,7 @@
         "ram": 512,
         "hdd": 2,
         "os": "debian",
-        "version": "12"
+        "version": "13"
       }
     }
   ],
@@ -31,10 +31,5 @@
     "username": null,
     "password": null
   },
-  "notes": [
-    {
-      "text": "WARNING: Installation sources scripts outside of Community Scripts repo. Please check the source before installing.",
-      "type": "warning"
-    }
-  ]
+  "notes": []
 }

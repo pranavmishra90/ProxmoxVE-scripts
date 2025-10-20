@@ -14,8 +14,9 @@ setting_up_container
 network_check
 update_os
 
-NODE_VERSION="22" NODE_MODULE="pnpm@latest" setup_nodejs
-PG_VERSION="16" setup_postgresql
+NODE_VERSION="22" NODE_MODULE="pnpm" setup_nodejs
+PG_VERSION="17" setup_postgresql
+fetch_and_deploy_gh_release "zipline" "diced/zipline" "tarball"
 
 msg_info "Setting up PostgreSQL"
 DB_NAME=ziplinedb
@@ -37,12 +38,7 @@ $STD sudo -u postgres psql -c "ALTER ROLE $DB_USER SET timezone TO 'UTC'"
 msg_ok "Set up PostgreSQL"
 
 msg_info "Installing Zipline (Patience)"
-cd /opt
-RELEASE=$(curl -fsSL https://api.github.com/repos/diced/zipline/releases/latest | grep "tag_name" | awk '{print substr($2, 3, length($2)-4) }')
-curl -fsSL "https://github.com/diced/zipline/archive/refs/tags/v${RELEASE}.zip" -o "v${RELEASE}.zip"
-$STD unzip v"${RELEASE}".zip
-mv zipline-"${RELEASE}" /opt/zipline
-cd /opt/zipline
+cd /opt/zipline || exit
 cat <<EOF >/opt/zipline/.env
 DATABASE_URL=postgres://$DB_USER:$DB_PASS@localhost:5432/$DB_NAME
 CORE_SECRET=$SECRET_KEY
@@ -55,7 +51,6 @@ EOF
 mkdir -p /opt/zipline-uploads
 $STD pnpm install
 $STD pnpm build
-echo "${RELEASE}" >"/opt/${APPLICATION}_version.txt"
 msg_ok "Installed Zipline"
 
 msg_info "Creating Service"
@@ -77,8 +72,9 @@ msg_ok "Created Service"
 
 motd_ssh
 customize
+
 msg_info "Cleaning up"
-rm -f /opt/v${RELEASE}.zip
-$STD apt-get -y autoremove
-$STD apt-get -y autoclean
+$STD apt -y autoremove
+$STD apt -y autoclean
+$STD apt -y clean
 msg_ok "Cleaned"

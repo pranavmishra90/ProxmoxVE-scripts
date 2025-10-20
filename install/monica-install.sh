@@ -13,16 +13,10 @@ setting_up_container
 network_check
 update_os
 
-msg_info "Installing Dependencies"
-$STD apt-get install -y \
-  apache2 \
-  libapache2-mod-php \
-  php-{bcmath,curl,dom,gd,gmp,iconv,intl,json,mbstring,mysqli,opcache,pdo-mysql,redis,tokenizer,xml,zip} \
-  composer
-msg_ok "Installed Dependencies"
-
+PHP_VERSION="8.2" PHP_APACHE="YES" PHP_MODULE="dom,gmp,iconv,mysqli,pdo-mysql,redis,tokenizer" setup_php
+setup_composer
 setup_mariadb
-NODE_VERSION="20" NODE_MODULE="yarn@latest" setup_nodejs
+NODE_VERSION="22" NODE_MODULE="yarn@latest" setup_nodejs
 
 msg_info "Setting up MariaDB"
 DB_NAME=monica
@@ -39,12 +33,9 @@ $STD mariadb -u root -e "GRANT ALL ON $DB_NAME.* TO '$DB_USER'@'localhost'; FLUS
 } >>~/monica.creds
 msg_ok "Set up MariaDB"
 
-msg_info "Installing monica"
-RELEASE=$(curl -fsSL https://api.github.com/repos/monicahq/monica/releases/latest | grep "tag_name" | awk '{print substr($2, 3, length($2)-4) }')
-cd /opt
-curl -fsSL "https://github.com/monicahq/monica/releases/download/v${RELEASE}/monica-v${RELEASE}.tar.bz2" -o "monica-v${RELEASE}.tar.bz2"
-tar -xjf "monica-v${RELEASE}.tar.bz2"
-mv "/opt/monica-v${RELEASE}" /opt/monica
+fetch_and_deploy_gh_release "monica" "monicahq/monica" "prebuild" "latest" "/opt/monica" "monica-v*.tar.bz2"
+
+msg_info "Configuring monica"
 cd /opt/monica
 cp /opt/monica/.env.example /opt/monica/.env
 HASH_SALT=$(openssl rand -base64 32)
@@ -53,14 +44,14 @@ sed -i -e "s|^DB_USERNAME=.*|DB_USERNAME=${DB_USER}|" \
   -e "s|^HASH_SALT=.*|HASH_SALT=${HASH_SALT}|" \
   /opt/monica/.env
 $STD composer install --no-dev -o --no-interaction
+$STD yarn config set ignore-engines true
 $STD yarn install
 $STD yarn run production
 $STD php artisan key:generate
 $STD php artisan setup:production --email=admin@helper-scripts.com --password=helper-scripts.com --force
 chown -R www-data:www-data /opt/monica
 chmod -R 775 /opt/monica/storage
-echo "${RELEASE}" >/opt/${APPLICATION}_version.txt
-msg_ok "Installed monica"
+msg_ok "Configured monica"
 
 msg_info "Creating Service"
 cat <<EOF >/etc/apache2/sites-available/monica.conf
@@ -87,7 +78,7 @@ motd_ssh
 customize
 
 msg_info "Cleaning up"
-rm -rf "/opt/monica-v${RELEASE}.tar.bz2"
-$STD apt-get -y autoremove
-$STD apt-get -y autoclean
+$STD apt -y autoremove
+$STD apt -y autoclean
+$STD apt -y clean
 msg_ok "Cleaned"

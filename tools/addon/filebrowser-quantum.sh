@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Copyright (c) 2021-2025 community-scripts ORG
-# Author: Author: MickLesk
+# Author: MickLesk
 # License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
 
 function header_info() {
@@ -53,20 +53,9 @@ fi
 
 header_info
 
-function msg_info() {
-  local msg="$1"
-  echo -e "${INFO} ${YW}${msg}...${CL}"
-}
-
-function msg_ok() {
-  local msg="$1"
-  echo -e "${CM} ${GN}${msg}${CL}"
-}
-
-function msg_error() {
-  local msg="$1"
-  echo -e "${CROSS} ${RD}${msg}${CL}"
-}
+function msg_info() { echo -e "${INFO} ${YW}$1...${CL}"; }
+function msg_ok() { echo -e "${CM} ${GN}$1${CL}"; }
+function msg_error() { echo -e "${CROSS} ${RD}$1${CL}"; }
 
 # Detect legacy FileBrowser installation
 LEGACY_DB="/usr/local/community-scripts/filebrowser.db"
@@ -96,7 +85,7 @@ if [[ -f "$LEGACY_DB" || -f "$LEGACY_BIN" && ! -f "$CONFIG_PATH" ]]; then
   fi
 fi
 
-# Check existing installation
+# Existing installation
 if [[ -f "$INSTALL_PATH" ]]; then
   echo -e "${YW}⚠️ ${APP} is already installed.${CL}"
   echo -n "Uninstall ${APP}? (y/N): "
@@ -137,72 +126,80 @@ PORT=${PORT:-$DEFAULT_PORT}
 
 echo -n "Install ${APP}? (y/n): "
 read -r install_prompt
-if [[ "${install_prompt,,}" =~ ^(y|yes)$ ]]; then
-  msg_info "Installing ${APP} on ${OS}"
-  $PKG_MANAGER curl ffmpeg &>/dev/null
-  curl -fsSL https://github.com/gtsteffaniak/filebrowser/releases/latest/download/linux-amd64-filebrowser -o "$INSTALL_PATH"
-  chmod +x "$INSTALL_PATH"
-  msg_ok "Installed ${APP}"
+if ! [[ "${install_prompt,,}" =~ ^(y|yes)$ ]]; then
+  echo -e "${YW}⚠️ Installation skipped. Exiting.${CL}"
+  exit 0
+fi
 
-  msg_info "Preparing configuration directory"
-  mkdir -p /usr/local/community-scripts
-  chown root:root /usr/local/community-scripts
-  chmod 755 /usr/local/community-scripts
-  msg_ok "Directory prepared"
+msg_info "Installing ${APP} on ${OS}"
+$PKG_MANAGER curl ffmpeg &>/dev/null
+curl -fsSL https://github.com/gtsteffaniak/filebrowser/releases/latest/download/linux-amd64-filebrowser -o "$INSTALL_PATH"
+chmod +x "$INSTALL_PATH"
+msg_ok "Installed ${APP}"
 
-  echo -n "Use No Authentication? (y/N): "
-  read -r noauth_prompt
+msg_info "Preparing configuration directory"
+mkdir -p /usr/local/community-scripts
+chown root:root /usr/local/community-scripts
+chmod 755 /usr/local/community-scripts
+msg_ok "Directory prepared"
 
-  if [[ "${noauth_prompt,,}" =~ ^(y|yes)$ ]]; then
-    cat <<EOF >"$CONFIG_PATH"
+echo -n "Use No Authentication? (y/N): "
+read -r noauth_prompt
+
+# === YAML CONFIG GENERATION ===
+if [[ "${noauth_prompt,,}" =~ ^(y|yes)$ ]]; then
+  cat <<EOF >"$CONFIG_PATH"
 server:
   port: $PORT
   sources:
-    - path: "$SRC_DIR"
+    - path: "$SRC_DIR"      
+      name: "RootFS"
       config:
+        denyByDefault: false
         disableIndexing: false
         indexingIntervalMinutes: 240
-        exclude:
-          folderPaths:
-            - "/proc"
-            - "/sys"
-            - "/dev"
-            - "/run"
-            - "/tmp"
-            - "/lost+found"
+        conditionals:
+          rules:
+            - neverWatchPath: "/proc"
+            - neverWatchPath: "/sys"
+            - neverWatchPath: "/dev"
+            - neverWatchPath: "/run"
+            - neverWatchPath: "/tmp"
+            - neverWatchPath: "/lost+found"
 auth:
   methods:
     noauth: true
 EOF
-    msg_ok "Configured with no authentication"
-  else
-    cat <<EOF >"$CONFIG_PATH"
+  msg_ok "Configured with no authentication"
+else
+  cat <<EOF >"$CONFIG_PATH"
 server:
   port: $PORT
   sources:
     - path: "$SRC_DIR"
+      name: "RootFS"
       config:
+        denyByDefault: false
         disableIndexing: false
         indexingIntervalMinutes: 240
-        exclude:
-          folderPaths:
-            - "/proc"
-            - "/sys"
-            - "/dev"
-            - "/run"
-            - "/tmp"
-            - "/lost+found"
+        conditionals:
+          rules:
+            - neverWatchPath: "/proc"
+            - neverWatchPath: "/sys"
+            - neverWatchPath: "/dev"
+            - neverWatchPath: "/run"
+            - neverWatchPath: "/tmp"
+            - neverWatchPath: "/lost+found"
 auth:
   adminUsername: admin
   adminPassword: helper-scripts.com
 EOF
-    msg_ok "Configured with default admin (admin / helper-scripts.com)"
-  fi
+  msg_ok "Configured with default admin (admin / helper-scripts.com)"
+fi
 
-  msg_info "Creating service"
-
-  if [[ "$OS" == "Debian" ]]; then
-    cat <<EOF >"$SERVICE_PATH"
+msg_info "Creating service"
+if [[ "$OS" == "Debian" ]]; then
+  cat <<EOF >"$SERVICE_PATH"
 [Unit]
 Description=FileBrowser Quantum
 After=network.target
@@ -216,9 +213,9 @@ Restart=always
 [Install]
 WantedBy=multi-user.target
 EOF
-    systemctl enable --now filebrowser &>/dev/null
-  else
-    cat <<EOF >"$SERVICE_PATH"
+  systemctl enable --now filebrowser &>/dev/null
+else
+  cat <<EOF >"$SERVICE_PATH"
 #!/sbin/openrc-run
 
 command="/usr/local/bin/filebrowser"
@@ -231,14 +228,10 @@ depend() {
     need net
 }
 EOF
-    chmod +x "$SERVICE_PATH"
-    rc-update add filebrowser default &>/dev/null
-    rc-service filebrowser start &>/dev/null
-  fi
-
-  msg_ok "Service created successfully"
-  echo -e "${CM} ${GN}${APP} is reachable at: ${BL}http://$IP:$PORT${CL}"
-else
-  echo -e "${YW}⚠️ Installation skipped. Exiting.${CL}"
-  exit 0
+  chmod +x "$SERVICE_PATH"
+  rc-update add filebrowser default &>/dev/null
+  rc-service filebrowser start &>/dev/null
 fi
+
+msg_ok "Service created successfully"
+echo -e "${CM} ${GN}${APP} is reachable at: ${BL}http://$IP:$PORT${CL}"

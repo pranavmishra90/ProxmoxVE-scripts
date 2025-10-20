@@ -11,7 +11,7 @@ var_cpu="${var_cpu:-1}"
 var_ram="${var_ram:-2048}"
 var_disk="${var_disk:-5}"
 var_os="${var_os:-debian}"
-var_version="${var_version:-12}"
+var_version="${var_version:-13}"
 var_unprivileged="${var_unprivileged:-1}"
 
 header_info "$APP"
@@ -23,29 +23,28 @@ function update_script() {
   header_info
   check_container_storage
   check_container_resources
-
   if [[ ! -f /usr/bin/zot ]]; then
     msg_error "No ${APP} installation found!"
     exit
   fi
 
-  RELEASE=$(curl -fsSL https://api.github.com/repos/project-zot/zot/releases/latest | grep "tag_name" | awk '{print substr($2, 2, length($2)-3)}')
-  if [[ ! -f ~/.${APP} ]] || [[ "${RELEASE}" != "$(cat ~/.${APP})" ]]; then
+  if check_for_gh_release "zot" "project-zot/zot"; then
     msg_info "Stopping Zot service"
     systemctl stop zot
     msg_ok "Stopped Zot service"
 
-    msg_info "Updating Zot to ${RELEASE}"
-    curl -fsSL "https://github.com/project-zot/zot/releases/download/${RELEASE}/zot-linux-amd64" -o /usr/bin/zot
-    chmod +x /usr/bin/zot
-    chown root:root /usr/bin/zot
-    echo "${RELEASE}" >~/.${APP}
-    systemctl restart zot
-    msg_ok "Updated Zot to ${RELEASE}"
-  else
-    msg_ok "Zot is already up to date (${RELEASE})"
-  fi
+    rm -f /usr/bin/zot
+    fetch_and_deploy_gh_release "zot" "project-zot/zot" "singlefile" "latest" "/usr/bin" "zot-linux-amd64"
 
+    msg_info "Configuring Zot Registry"
+    chown root:root /usr/bin/zot
+    msg_ok "Configured Zot Registry"
+
+    msg_info "Starting service"
+    systemctl start zot
+    msg_ok "Service started"
+    msg_ok "Updated successfully"
+  fi
   exit
 }
 

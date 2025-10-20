@@ -11,7 +11,7 @@ var_cpu="${var_cpu:-1}"
 var_ram="${var_ram:-512}"
 var_disk="${var_disk:-2}"
 var_os="${var_os:-debian}"
-var_version="${var_version:-12}"
+var_version="${var_version:-13}"
 var_unprivileged="${var_unprivileged:-1}"
 
 header_info "$APP"
@@ -27,9 +27,7 @@ function update_script() {
     msg_error "No ${APP} Installation Found!"
     exit
   fi
-  RELEASE=$(curl -fsSL https://api.github.com/repos/TriliumNext/Trilium/releases/latest | grep "tag_name" | awk '{print substr($2, 3, length($2)-4) }')
-  if [[ "${RELEASE}" != "$(cat ~/.Trilium 2>/dev/null)" ]] || [[ ! -f ~/.Trilium ]]; then
-
+  if check_for_gh_release "Trilium" "TriliumNext/Trilium"; then
     if [[ -d /opt/trilium/db ]]; then
       DB_PATH="/opt/trilium/db"
       DB_RESTORE_PATH="/opt/trilium/db"
@@ -41,10 +39,10 @@ function update_script() {
       exit 1
     fi
 
-    msg_info "Stopping ${APP}"
+    msg_info "Stopping Service"
     systemctl stop trilium
     sleep 1
-    msg_ok "Stopped ${APP}"
+    msg_ok "Stopped Service"
 
     msg_info "Backing up Database"
     mkdir -p /opt/trilium_backup
@@ -61,17 +59,17 @@ function update_script() {
 
     msg_info "Cleaning up"
     rm -rf /opt/trilium_backup
+    $STD apt -y autoremove
+    $STD apt -y autoclean
+    $STD apt -y clean
     msg_ok "Cleaned"
 
-    msg_info "Starting ${APP}"
+    msg_info "Starting Service"
     systemctl start trilium
     sleep 1
-    msg_ok "Started ${APP}"
+    msg_ok "Started Service"
     msg_ok "Updated Successfully"
-  else
-    msg_ok "No update required. ${APP} is already at ${RELEASE}"
   fi
-
   exit
 }
 

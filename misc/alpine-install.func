@@ -82,6 +82,7 @@ network_check() {
 update_os() {
   msg_info "Updating Container OS"
   $STD apk -U upgrade
+  source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/tools.func)
   msg_ok "Updated Container OS"
 }
 
@@ -152,4 +153,11 @@ EOF
 
   echo "bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/pranavmishra90/ProxmoxVE/main/ct/${app}.sh)\"" >/usr/bin/update
   chmod +x /usr/bin/update
+
+  if [[ -n "${SSH_AUTHORIZED_KEY}" ]]; then
+    mkdir -p /root/.ssh
+    echo "${SSH_AUTHORIZED_KEY}" >/root/.ssh/authorized_keys
+    chmod 700 /root/.ssh
+    chmod 600 /root/.ssh/authorized_keys
+  fi
 }

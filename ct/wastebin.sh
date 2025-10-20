@@ -13,7 +13,7 @@ var_cpu="${var_cpu:-1}"
 var_ram="${var_ram:-1024}"
 var_disk="${var_disk:-4}"
 var_os="${var_os:-debian}"
-var_version="${var_version:-12}"
+var_version="${var_version:-13}"
 var_unprivileged="${var_unprivileged:-1}"
 
 header_info "$APP"
@@ -28,6 +28,10 @@ function update_script() {
   if [[ ! -d /opt/wastebin ]]; then
     msg_error "No ${APP} Installation Found!"
     exit
+  fi
+  if ! [[ $(dpkg -s zstd 2>/dev/null) ]]; then
+    $STD apt update
+    $STD apt install -y zstd
   fi
   RELEASE=$(curl -fsSL https://api.github.com/repos/matze/wastebin/releases/latest | grep "tag_name" | awk '{print substr($2, 2, length($2)-3) }')
   # Dirty-Fix 03/2025 for missing APP_version.txt on old installations, set to pre-latest release
@@ -67,9 +71,10 @@ EOF
     msg_info "Updating Wastebin"
     temp_file=$(mktemp)
     curl -fsSL "https://github.com/matze/wastebin/releases/download/${RELEASE}/wastebin_${RELEASE}_x86_64-unknown-linux-musl.tar.zst" -o "$temp_file"
-    tar -xf $temp_file
-    cp -f wastebin /opt/wastebin/
+    tar -xf "$temp_file"
+    cp -f wastebin* /opt/wastebin/
     chmod +x /opt/wastebin/wastebin
+    chmod +x /opt/wastebin/wastebin-ctl
     echo "${RELEASE}" >/opt/${APP}_version.txt
     msg_ok "Updated Wastebin"
 
@@ -78,7 +83,7 @@ EOF
     msg_ok "Started Wastebin"
 
     msg_info "Cleaning Up"
-    rm -f $temp_file
+    rm -f "$temp_file"
     msg_ok "Cleanup Completed"
     msg_ok "Updated Successfully"
   else

@@ -32,7 +32,6 @@ function on_exit() {
 }
 
 function error_handler() {
-
   local exit_code="$?"
   local line_number="$1"
   local command="$2"
@@ -51,34 +50,28 @@ function on_terminate() {
   exit 143
 }
 
+function exit_script() {
+  clear
+  printf "\e[?25h"
+  echo -e "\n${CROSS}${RD}User exited script${CL}\n"
+  kill 0
+  exit 1
+}
+
 function check_storage_support() {
   local CONTENT="$1"
   local -a VALID_STORAGES=()
-
   while IFS= read -r line; do
-    local STORAGE=$(awk '{print $1}' <<<"$line")
-    [[ "$STORAGE" == "storage" || -z "$STORAGE" ]] && continue
-    VALID_STORAGES+=("$STORAGE")
+    local STORAGE_NAME
+    STORAGE_NAME=$(awk '{print $1}' <<<"$line")
+    [[ -z "$STORAGE_NAME" ]] && continue
+    VALID_STORAGES+=("$STORAGE_NAME")
   done < <(pvesm status -content "$CONTENT" 2>/dev/null | awk 'NR>1')
 
   [[ ${#VALID_STORAGES[@]} -gt 0 ]]
 }
 
-# This checks for the presence of valid Container Storage and Template Storage locations
-msg_info "Validating Storage"
-if ! check_storage_support "rootdir"; then
-
-  msg_error "No valid storage found for 'rootdir' (Container)."
-  exit 1
-fi
-if ! check_storage_support "vztmpl"; then
-
-  msg_error "No valid storage found for 'vztmpl' (Template)."
-  exit 1
-fi
-msg_ok "Validated Storage (rootdir / vztmpl)."
-
-# This function is used to select the storage class and determine the corresponding storage content type and label.
+# This function selects a storage pool for a given content type (e.g., rootdir, vztmpl).
 function select_storage() {
   local CLASS=$1 CONTENT CONTENT_LABEL
 
@@ -113,17 +106,30 @@ function select_storage() {
     ;;
   esac
 
-local -a MENU
+  # Check for preset STORAGE variable
+  if [ "$CONTENT" = "rootdir" ] && [ -n "${STORAGE:-}" ]; then
+    if pvesm status -content "$CONTENT" | awk 'NR>1 {print $1}' | grep -qx "$STORAGE"; then
+      STORAGE_RESULT="$STORAGE"
+      msg_info "Using preset storage: $STORAGE_RESULT for $CONTENT_LABEL"
+      return 0
+    else
+      msg_error "Preset storage '$STORAGE' is not valid for content type '$CONTENT'."
+      return 2
+    fi
+  fi
+
   local -A STORAGE_MAP
+  local -a MENU
   local COL_WIDTH=0
 
   while read -r TAG TYPE _ TOTAL USED FREE _; do
     [[ -n "$TAG" && -n "$TYPE" ]] || continue
-    local DISPLAY="${TAG} (${TYPE})"
+    local STORAGE_NAME="$TAG"
+    local DISPLAY="${STORAGE_NAME} (${TYPE})"
     local USED_FMT=$(numfmt --to=iec --from-unit=K --format %.1f <<<"$USED")
     local FREE_FMT=$(numfmt --to=iec --from-unit=K --format %.1f <<<"$FREE")
     local INFO="Free: ${FREE_FMT}B  Used: ${USED_FMT}B"
-    STORAGE_MAP["$DISPLAY"]="$TAG"
+    STORAGE_MAP["$DISPLAY"]="$STORAGE_NAME"
     MENU+=("$DISPLAY" "$INFO" "OFF")
     ((${#DISPLAY} > COL_WIDTH)) && COL_WIDTH=${#DISPLAY}
   done < <(pvesm status -content "$CONTENT" | awk 'NR>1')
@@ -135,17 +141,23 @@ local -a MENU
 
   if [ $((${#MENU[@]} / 3)) -eq 1 ]; then
     STORAGE_RESULT="${STORAGE_MAP[${MENU[0]}]}"
+    STORAGE_INFO="${MENU[1]}"
     return 0
   fi
 
   local WIDTH=$((COL_WIDTH + 42))
   while true; do
-    local DISPLAY_SELECTED=$(whiptail --backtitle "Proxmox VE Helper Scripts" \
+    local DISPLAY_SELECTED
+    DISPLAY_SELECTED=$(whiptail --backtitle "Proxmox VE Helper Scripts" \
       --title "Storage Pools" \
       --radiolist "Which storage pool for ${CONTENT_LABEL,,}?\n(Spacebar to select)" \
       16 "$WIDTH" 6 "${MENU[@]}" 3>&1 1>&2 2>&3)
 
-    [[ $? -ne 0 ]] && return 3
+    # Cancel or ESC
+    [[ $? -ne 0 ]] && exit_script
+
+    # Strip trailing whitespace or newline (important for storages like "storage (dir)")
+    DISPLAY_SELECTED=$(sed 's/[[:space:]]*$//' <<<"$DISPLAY_SELECTED")
 
     if [[ -z "$DISPLAY_SELECTED" || -z "${STORAGE_MAP[$DISPLAY_SELECTED]+_}" ]]; then
       whiptail --msgbox "No valid storage selected. Please try again." 8 58
@@ -153,6 +165,12 @@ local -a MENU
     fi
 
     STORAGE_RESULT="${STORAGE_MAP[$DISPLAY_SELECTED]}"
+    for ((i = 0; i < ${#MENU[@]}; i += 3)); do
+      if [[ "${MENU[$i]}" == "$DISPLAY_SELECTED" ]]; then
+        STORAGE_INFO="${MENU[$i + 1]}"
+        break
+      fi
+    done
     return 0
   done
 }
@@ -181,45 +199,23 @@ if qm status "$CTID" &>/dev/null || pct status "$CTID" &>/dev/null; then
   exit 206
 fi
 
-# DEFAULT_FILE="/usr/local/community-scripts/default_storage"
-# if [[ -f "$DEFAULT_FILE" ]]; then
-#   source "$DEFAULT_FILE"
-#   if [[ -n "$TEMPLATE_STORAGE" && -n "$CONTAINER_STORAGE" ]]; then
-#     msg_info "Using default storage configuration from: $DEFAULT_FILE"
-#     msg_ok "Template Storage: ${BL}$TEMPLATE_STORAGE${CL} ${GN}|${CL} Container Storage: ${BL}$CONTAINER_STORAGE${CL}"
-#   else
-#     msg_warn "Default storage file exists but is incomplete – falling back to manual selection"
-#     TEMPLATE_STORAGE=$(select_storage template)
-#     msg_ok "Using ${BL}$TEMPLATE_STORAGE${CL} ${GN}for Template Storage."
-#     CONTAINER_STORAGE=$(select_storage container)
-#     msg_ok "Using ${BL}$CONTAINER_STORAGE${CL} ${GN}for Container Storage."
-#   fi
-# else
-#   # TEMPLATE STORAGE SELECTION
-#   # Template Storage
-#   while true; do
-#     TEMPLATE_STORAGE=$(select_storage template)
-#     if [[ -n "$TEMPLATE_STORAGE" ]]; then
-#       msg_ok "Using ${BL}$TEMPLATE_STORAGE${CL} ${GN}for Template Storage."
-#       break
-#     fi
-#     msg_warn "No valid template storage selected. Please try again."
-#   done
+# This checks for the presence of valid Container Storage and Template Storage locations
+msg_info "Validating storage"
+if ! check_storage_support "rootdir"; then
+  msg_error "No valid storage found for 'rootdir' [Container]"
+  exit 1
+fi
+if ! check_storage_support "vztmpl"; then
+  msg_error "No valid storage found for 'vztmpl' [Template]"
+  exit 1
+fi
 
-#   while true; do
-#     CONTAINER_STORAGE=$(select_storage container)
-#     if [[ -n "$CONTAINER_STORAGE" ]]; then
-#       msg_ok "Using ${BL}$CONTAINER_STORAGE${CL} ${GN}for Container Storage."
-#       break
-#     fi
-#     msg_warn "No valid container storage selected. Please try again."
-#   done
-
-# fi
-
+#msg_info "Checking template storage"
 while true; do
   if select_storage template; then
     TEMPLATE_STORAGE="$STORAGE_RESULT"
+    TEMPLATE_STORAGE_INFO="$STORAGE_INFO"
+    msg_ok "Storage ${BL}$TEMPLATE_STORAGE${CL} ($TEMPLATE_STORAGE_INFO) [Template]"
     break
   fi
 done
@@ -227,6 +223,8 @@ done
 while true; do
   if select_storage container; then
     CONTAINER_STORAGE="$STORAGE_RESULT"
+    CONTAINER_STORAGE_INFO="$STORAGE_INFO"
+    msg_ok "Storage ${BL}$CONTAINER_STORAGE${CL} ($CONTAINER_STORAGE_INFO) [Container]"
     break
   fi
 done
@@ -238,11 +236,12 @@ if [ "$STORAGE_FREE" -lt "$REQUIRED_KB" ]; then
   msg_error "Not enough space on '$CONTAINER_STORAGE'. Needed: ${PCT_DISK_SIZE:-8}G."
   exit 214
 fi
+
 # Check Cluster Quorum if in Cluster
 if [ -f /etc/pve/corosync.conf ]; then
-  msg_info "Checking Proxmox cluster quorum status"
+  msg_info "Checking cluster quorum"
   if ! pvecm status | awk -F':' '/^Quorate/ { exit ($2 ~ /Yes/) ? 0 : 1 }'; then
-    printf "\e[?25h"
+
     msg_error "Cluster is not quorate. Start all nodes or configure quorum device (QDevice)."
     exit 210
   fi
@@ -251,49 +250,67 @@ fi
 
 # Update LXC template list
 TEMPLATE_SEARCH="${PCT_OSTYPE}-${PCT_OSVERSION:-}"
+case "$PCT_OSTYPE" in
+debian | ubuntu)
+  TEMPLATE_PATTERN="-standard_"
+  ;;
+alpine | fedora | rocky | centos)
+  TEMPLATE_PATTERN="-default_"
+  ;;
+*)
+  TEMPLATE_PATTERN=""
+  ;;
+esac
 
-msg_info "Updating LXC Template List"
-if ! timeout 15 pveam update >/dev/null 2>&1; then
-  TEMPLATE_FALLBACK=$(pveam list "$TEMPLATE_STORAGE" | awk "/$TEMPLATE_SEARCH/ {print \$2}" | sort -t - -k 2 -V | tail -n1)
-  if [[ -z "$TEMPLATE_FALLBACK" ]]; then
-    msg_error "Failed to update LXC template list and no local template matching '$TEMPLATE_SEARCH' found."
-    exit 201
-  fi
-  msg_info "Skipping template update – using local fallback: $TEMPLATE_FALLBACK"
+# 1. Check local templates first
+msg_info "Searching for template '$TEMPLATE_SEARCH'"
+mapfile -t TEMPLATES < <(
+  pveam list "$TEMPLATE_STORAGE" |
+    awk -v s="$TEMPLATE_SEARCH" -v p="$TEMPLATE_PATTERN" '$1 ~ s && $1 ~ p {print $1}' |
+    sed 's/.*\///' | sort -t - -k 2 -V
+)
+
+if [ ${#TEMPLATES[@]} -gt 0 ]; then
+  TEMPLATE_SOURCE="local"
 else
-  msg_ok "LXC Template List Updated"
-fi
-
-# Get LXC template string
-TEMPLATE_SEARCH="${PCT_OSTYPE}-${PCT_OSVERSION:-}"
-mapfile -t TEMPLATES < <(pveam available -section system | sed -n "s/.*\($TEMPLATE_SEARCH.*\)/\1/p" | sort -t - -k 2 -V)
-
-if [ ${#TEMPLATES[@]} -eq 0 ]; then
-  msg_error "No matching LXC template found for '${TEMPLATE_SEARCH}'. Make sure your host can reach the Proxmox template repository."
-  exit 207
+  msg_info "No local template found, checking online repository"
+  pveam update >/dev/null 2>&1
+  mapfile -t TEMPLATES < <(
+    pveam update >/dev/null 2>&1 &&
+      pveam available -section system |
+      sed -n "s/.*\($TEMPLATE_SEARCH.*$TEMPLATE_PATTERN.*\)/\1/p" |
+        sort -t - -k 2 -V
+  )
+  TEMPLATE_SOURCE="online"
 fi
 
 TEMPLATE="${TEMPLATES[-1]}"
-TEMPLATE_PATH="$(pvesm path $TEMPLATE_STORAGE:vztmpl/$TEMPLATE 2>/dev/null || echo "/var/lib/vz/template/cache/$TEMPLATE")"
+TEMPLATE_PATH="$(pvesm path $TEMPLATE_STORAGE:vztmpl/$TEMPLATE 2>/dev/null ||
+  echo "/var/lib/vz/template/cache/$TEMPLATE")"
+msg_ok "Template ${BL}$TEMPLATE${CL} [$TEMPLATE_SOURCE]"
 
-# Check if template exists and is valid
-if ! pveam list "$TEMPLATE_STORAGE" | grep -q "$TEMPLATE" || ! zstdcat "$TEMPLATE_PATH" | tar -tf - >/dev/null 2>&1; then
-  msg_warn "Template $TEMPLATE not found or appears to be corrupted. Re-downloading."
+# 4. Validate template (exists & not corrupted)
+TEMPLATE_VALID=1
 
+if [ ! -s "$TEMPLATE_PATH" ]; then
+  TEMPLATE_VALID=0
+elif ! tar --use-compress-program=zstdcat -tf "$TEMPLATE_PATH" >/dev/null 2>&1; then
+  TEMPLATE_VALID=0
+fi
+
+if [ "$TEMPLATE_VALID" -eq 0 ]; then
+  msg_warn "Template $TEMPLATE is missing or corrupted. Re-downloading."
   [[ -f "$TEMPLATE_PATH" ]] && rm -f "$TEMPLATE_PATH"
   for attempt in {1..3}; do
     msg_info "Attempt $attempt: Downloading LXC template..."
-
-    if timeout 120 pveam download "$TEMPLATE_STORAGE" "$TEMPLATE" >/dev/null 2>&1; then
+    if pveam download "$TEMPLATE_STORAGE" "$TEMPLATE" >/dev/null 2>&1; then
       msg_ok "Template download successful."
       break
     fi
-
     if [ $attempt -eq 3 ]; then
-      msg_error "Failed after 3 attempts. Please check your Proxmox host’s internet access or manually run:\n  pveam download $TEMPLATE_STORAGE $TEMPLATE"
+      msg_error "Failed after 3 attempts. Please check network access or manually run:\n  pveam download $TEMPLATE_STORAGE $TEMPLATE"
       exit 208
     fi
-
     sleep $((attempt * 5))
   done
 fi
@@ -309,7 +326,7 @@ PCT_OPTIONS=(${PCT_OPTIONS[@]:-${DEFAULT_PCT_OPTIONS[@]}})
 
 # Secure creation of the LXC container with lock and template check
 lockfile="/tmp/template.${TEMPLATE}.lock"
-exec 9>"$lockfile" >/dev/null 2>&1 || {
+exec 9>"$lockfile" || {
   msg_error "Failed to create lock file '$lockfile'."
   exit 200
 }
@@ -328,7 +345,7 @@ if ! pct create "$CTID" "${TEMPLATE_STORAGE}:vztmpl/${TEMPLATE}" "${PCT_OPTIONS[
     msg_error "Template appears to be corrupted – re-downloading."
     rm -f "$TEMPLATE_PATH"
   else
-    msg_error "Template is valid, but container creation still failed."
+    msg_error "Template is valid, but container creation failed. Update your whole Proxmox System (pve-container) first or check https://github.com/community-scripts/ProxmoxVE/discussions/8126"
     exit 209
   fi
 
@@ -347,7 +364,6 @@ if ! pct create "$CTID" "${TEMPLATE_STORAGE}:vztmpl/${TEMPLATE}" "${PCT_OPTIONS[
   done
 
   sleep 1 # I/O-Sync-Delay
-
   msg_ok "Re-downloaded LXC Template"
 fi
 

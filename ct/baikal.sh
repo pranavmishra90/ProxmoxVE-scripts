@@ -28,8 +28,7 @@ function update_script() {
     msg_error "No ${APP} Installation Found!"
     exit
   fi
-  RELEASE=$(curl -fsSL https://api.github.com/repos/sabre-io/Baikal/releases/latest | grep "tag_name" | awk '{print substr($2, 2, length($2)-3) }')
-  if [[ "${RELEASE}" != "$(cat ~/.baikal 2>/dev/null)" ]] || [[ ! -f ~/.baikal ]]; then
+  if check_for_gh_release "baikal" "sabre-io/Baikal"; then
     msg_info "Stopping Service"
     systemctl stop apache2
     msg_ok "Stopped Service"
@@ -39,12 +38,15 @@ function update_script() {
     msg_ok "Backed up data"
 
     fetch_and_deploy_gh_release "baikal" "sabre-io/Baikal"
+    setup_composer
 
     msg_info "Configuring Baikal"
     cp -r /opt/baikal-backup/config/baikal.yaml /opt/baikal/config/
     cp -r /opt/baikal-backup/Specific/ /opt/baikal/
     chown -R www-data:www-data /opt/baikal/
     chmod -R 755 /opt/baikal/
+    cd /opt/baikal
+    $STD composer install
     msg_ok "Configured Baikal"
 
     msg_info "Starting Service"
@@ -55,8 +57,6 @@ function update_script() {
     rm -rf /opt/baikal-backup
     msg_ok "Cleaned"
     msg_ok "Updated Successfully"
-  else
-    msg_ok "No update required. ${APP} is already at v${RELEASE}"
   fi
   exit
 }

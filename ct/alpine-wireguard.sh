@@ -13,6 +13,7 @@ var_disk="${var_disk:-1}"
 var_os="${var_os:-alpine}"
 var_version="${var_version:-3.22}"
 var_unprivileged="${var_unprivileged:-1}"
+var_tun="${var_tun:-1}"
 
 header_info "$APP"
 variables
@@ -31,7 +32,7 @@ function update_script() {
   if [[ -d /etc/wgdashboard/src ]]; then
     msg_info "update WGDashboard"
     cd /etc/wgdashboard/src
-    $STD echo "y" | ./wgd.sh update
+    echo "y" | ./wgd.sh update >/dev/null 2>&1
     $STD ./wgd.sh start
     msg_ok "WGDashboard updated"
   fi
