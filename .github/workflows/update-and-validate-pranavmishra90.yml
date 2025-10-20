@@ -1,9 +1,9 @@
 name: Update and Validate Upstream Scripts
 
 on:
-  push:
-    branches-ignore:
-      - feat/update-*
+  # push:
+  #   branches-ignore:
+  #     - feat/update-*
   workflow_dispatch:
     inputs:
       dry_run:
