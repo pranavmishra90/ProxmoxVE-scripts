@@ -1,0 +1,102 @@
+name: Upstream update automation
+
+on:
+  push:
+    branches:
+      - upstream-update
+
+  workflow_dispatch:
+
+jobs:
+  update-from-upstream:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    outputs:
+      branch: ${{ steps.create_branch.outputs.branch }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ssh-key: ${{ secrets.FACSIMILAB_BOT_SSHKEY }}
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.13"
+
+      - name: Install uv and dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install uv
+
+      - name: Get date
+        id: date
+        run: echo "::set-output name=today::$(date -u +%F)"
+
+      - name: Create issue text
+        id: issue_text
+        run: |
+          cat <<EOF > /tmp/issue_body.md
+          Automated update run from branch `upstream-update` on ${{ steps.date.outputs.today }}.
+          This issue tracks the changes made by the automated regex replacements (`.github/workflows/scripts/pranavmishra90/regex-local-repo.py`).
+          EOF
+
+      - name: Create issue for upstream update
+        id: create_issue
+        uses: peter-evans/create-issue-from-file@v6
+        with:
+          title: "Update from `community-scripts/ProxmoxVE` [${{ steps.date.outputs.today }}]"
+          content-filepath: /tmp/issue_body.md
+      - name: Create branch for the issue
+        id: create_branch
+        run: |
+          DATE=${{ steps.date.outputs.today }}
+          BRANCH="feat/${DATE}"
+          git config user.name "Facsimilab Bot"
+          git config user.email "195262995+facsimilab-bot@users.noreply.github.com"
+          git checkout -b "${BRANCH}"
+          echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
+          echo "branch=${BRANCH}" >> $GITHUB_OUTPUT
+
+      - name: Run regex replacement script
+        run: |
+          uv run .github/workflows/scripts/pranavmishra90/regex-local-repo.py
+
+      - name: Commit changes
+        run: |
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "ci(pranavmishra90): regex replace upstream URLs. Closes #${{ steps.create_issue.outputs.issue-number }}"
+          fi
+
+      - name: Push branch
+        if: steps.create_branch.outputs == '' || always()
+        env:
+          BRANCH: ${{ env.BRANCH }}
+        run: |
+          # Use the branch name from env if set, otherwise compute again
+          if [ -z "${BRANCH}" ]; then
+            BRANCH="feat/$(date -u +%F)"
+          fi
+          git push origin "${BRANCH}"
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "ci(pranavmishra90): regex replace upstream URLs"
+          sign-commits: true
+          branch: ${{ steps.create_branch.outputs.branch }}
+          base: main
+          title: "Update from `community-scripts/ProxmoxVE` [${{ steps.date.outputs.today }}]"
+          body: |
+            This PR was created automatically by the upstream update workflow. It contains regex-based replacements of upstream URLs performed by the `regex-local-repo.py` script. Closes #${{ steps.create_issue.outputs.issue-number }}.
+          reviewers: |
+            pranavmishra90
